@@ -268,7 +268,9 @@ end;
 
 /* APPLICATION VERSIONING */
 
-/* 
+Write and read the version you are on, going to, coming from. 
+
+Helpful for maintaining conditional idempotent upgrade paths.
 
 STATUS can be 'SET' or 'CONFIRMED'. SET indicates we are in the middle of a patch or 
 upgrade and CONFIRMED indicates successful. get_app_version always returns the 
@@ -276,6 +278,11 @@ last confirmed version, not the version you are attempting to upgrade/patch to.
 
 confirm_app_version must be preceded by set_app_version. You can also call 
 set_app_version with p_confirmed=True which immediatly sets the status to CONFIRMED.
+
+ToDo: 
+
+- Add logging for failure and success using the logging interface.
+- (Unlikely) - Track errors using system wide trigger interface (not built) and report.
 
 */
 
