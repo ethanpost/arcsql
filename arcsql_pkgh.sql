@@ -68,6 +68,7 @@ create or replace package arcsql as
       p_confirm in boolean := false);
    procedure confirm_app_version(p_app_name in varchar2);
    function get_app_version(p_app_name in varchar2) return number;
+   procedure delete_app_version(p_app_name in varchar2);
    
    /* SIMPLE VALUE KEY STORE */
 

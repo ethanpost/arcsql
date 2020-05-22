@@ -357,6 +357,13 @@ begin
     return v_version;
 end;
 
+procedure delete_app_version(p_app_name in varchar2) is 
+   pragma autonomous_transaction;
+begin 
+  delete from app_version where app_name=upper(p_app_name);
+  commit;
+end;
+
 /* SIMPLE KEY VALUE STORE */
 
 procedure cache (
