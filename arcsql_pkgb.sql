@@ -277,7 +277,7 @@ upgrade and CONFIRMED indicates successful. get_app_version always returns the
 last confirmed version, not the version you are attempting to upgrade/patch to.
 
 confirm_app_version must be preceded by set_app_version. You can also call 
-set_app_version with p_confirmed=True which immediatly sets the status to CONFIRMED.
+set_app_version with p_confirmed=True which immediately sets the status to CONFIRMED.
 
 ToDo: 
 
@@ -290,7 +290,7 @@ procedure set_app_version(
    p_app_name in varchar2, 
    p_version in number,
    p_confirm in boolean := false) is 
-   -- Set numeric decimal version for an application.
+   -- Set status to 'SET' or 'CONFIRMED' and set version you are attempting to patch/upgrade too.
    pragma autonomous_transaction;
    n number;
    current_status varchar2(10);
@@ -339,6 +339,7 @@ begin
 end;
 
 procedure confirm_app_version(p_app_name in varchar2) is
+   -- Sets the status of the app version to 'CONFIRMED'.
    pragma autonomous_transaction;
 begin
    update app_version 
@@ -348,6 +349,7 @@ begin
 end;
 
 function get_app_version(p_app_name in varchar2) return number is 
+   -- Returns the last 'confirmed' version.
    v_version number;
 begin
    select decode(status, 'SET', last_version, 'CONFIRMED', version)
@@ -357,7 +359,19 @@ begin
     return v_version;
 end;
 
+function get_new_version(p_app_name in varchar2) return number is 
+   -- Returns the version you are currently patching or upgrading too.
+   v_version number;
+begin 
+   select version
+     into v_version
+     from app_version 
+    where app_name=upper(p_app_name);
+    return v_version;
+end;
+
 procedure delete_app_version(p_app_name in varchar2) is 
+   -- Deletes the reference to the app from the APP_VERSION table.
    pragma autonomous_transaction;
 begin 
   delete from app_version where app_name=upper(p_app_name);
