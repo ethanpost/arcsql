@@ -860,7 +860,7 @@ create or replace package arcsql as
    procedure set_app_version(
       p_app_name in varchar2, 
       p_version in number,
-      p_confirmed in boolean := false);
+      p_confirm in boolean := false);
    procedure confirm_app_version(p_app_name in varchar2);
    function get_app_version(p_app_name in varchar2) return number;
    
@@ -1226,7 +1226,7 @@ set_app_version with p_confirmed=True which immediatly sets the status to CONFIR
 procedure set_app_version(
    p_app_name in varchar2, 
    p_version in number,
-   p_confirmed in boolean := false) is 
+   p_confirm in boolean := false) is 
    -- Set numeric decimal version for an application.
    pragma autonomous_transaction;
    n number;
@@ -1236,13 +1236,13 @@ begin
 
    select count(*) into n from app_version where app_name=upper(p_app_name);
 
-   if p_confirmed then 
-      new_status='CONFIRMED';
+   if p_confirm then 
+      new_status := 'CONFIRMED';
    else
-      new_status='SET';
+      new_status := 'SET';
    end if;
    
-   if n == 0 then 
+   if n = 0 then 
       insert into app_version (
          app_name,
          last_version,
@@ -1254,7 +1254,7 @@ begin
          new_status);
    else 
       select status into current_status from app_version where app_name=upper(p_app_name);
-      if current_status == 'CONFIRMED' then 
+      if current_status = 'CONFIRMED' then 
          -- Only change last_version to version when last attempt was confirmed.
          update app_version 
             set last_version=version,
@@ -1262,7 +1262,7 @@ begin
                 version=p_version,
                 status=new_status
           where app_name=upper(p_app_name);
-      elsif current_status == 'SET' then 
+      elsif current_status = 'SET' then 
          -- If last attempt was not confirmed (failed) then last_version 
          -- remains the same since it is the last confirmed version.
          update app_version 
