@@ -81,6 +81,18 @@ when others then
 end;
 /
 
+-- uninstall: drop procedure drop_index;
+create or replace procedure drop_index(index_name varchar2) is 
+begin
+  if does_object_exist(drop_index.index_name, 'INDEX') then
+    drop_object(drop_index.index_name, 'INDEX');
+  end if;
+exception
+  when others then
+     raise;
+end;
+/
+
 -- uninstall: drop procedure drop_object;
 create or replace procedure drop_object (object_name varchar2, object_type varchar2) is
    n number;
@@ -129,6 +141,14 @@ begin
 end;
 /
 
+create or replace procedure create_sequence (sequence_name in varchar2) is 
+begin
+   if not does_sequence_exist(sequence_name) then
+      execute_sql('create sequence '||sequence_name, false);
+   end if;
+end;
+/
+
 -- uninstall: drop function does_matching_job_exist;
 create or replace function does_matching_job_exist (job_name varchar2) return boolean is
    n number;
@@ -167,6 +187,7 @@ exception
 end;
 /
 
+-- Needs to be a standalong func here and not in arcsql package becuase authid current user is used.
 create or replace function num_get_val_from_sql(sql_text in varchar2) return number authid current_user is 
    n number;
 begin

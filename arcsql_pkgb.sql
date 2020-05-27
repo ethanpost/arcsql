@@ -266,7 +266,9 @@ begin
    return n;
 end;
 
-/* APPLICATION VERSIONING */
+/* 
+
+APPLICATION VERSIONING 
 
 Write and read the version you are on, going to, coming from. 
 
@@ -378,7 +380,12 @@ begin
   commit;
 end;
 
-/* SIMPLE KEY VALUE STORE */
+/* 
+SIMPLE KEY VALUE STORE 
+
+ToDo: 
+- Change input vars so they are consistent.
+*/
 
 procedure cache (
    cache_key varchar2, 
