@@ -1450,11 +1450,11 @@ begin
    test;
 end;
 
-procedure fail_test is 
+procedure fail_test(fail_message in varchar2 default null) is 
 begin 
    test_passed := 0;
    test;
-   raise_application_error(-20001, '*** Unit Test Failure ***');
+   raise_application_error(-20001, '*** Failure *** '||fail_message);
 end;
 
 procedure test is 

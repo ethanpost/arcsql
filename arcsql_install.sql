@@ -10,4 +10,5 @@ show errors
 alter package arcsql compile body;
 show errors
 @arcsql_config.sql
+commit;
 

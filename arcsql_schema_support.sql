@@ -21,6 +21,10 @@ begin
       select count(*) into n 
         from user_types
        where type_name=upper(does_object_exist.object_name);
+   elsif upper(does_object_exist.object_type) = 'CONSTRAINT' then
+      select count(*) into n 
+        from user_constraints
+       where constraint_name=upper(does_object_exist.object_name);
    else
       select count(*) into n 
         from user_objects 
@@ -71,6 +75,20 @@ end;
 create or replace function does_index_exist (index_name varchar2) return boolean is
 begin
    if does_object_exist(does_index_exist.index_name, 'INDEX') then
+      return true;
+   else
+      return false;
+   end if;
+exception
+when others then
+   raise;
+end;
+/
+
+-- uninstall: drop function does_constraint_exist;
+create or replace function does_constraint_exist (constraint_name varchar2) return boolean is
+begin
+   if does_object_exist(does_constraint_exist.constraint_name, 'CONSTRAINT') then
       return true;
    else
       return false;

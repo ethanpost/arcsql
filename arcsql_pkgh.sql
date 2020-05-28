@@ -140,7 +140,7 @@ create or replace package arcsql as
    assert_true boolean := true;
    assert_false boolean := false;
    procedure pass_test;
-   procedure fail_test;
+   procedure fail_test(fail_message in varchar2 default null);
    procedure init_test(test_name varchar2);
    procedure test;
 
