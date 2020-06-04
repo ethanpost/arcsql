@@ -666,7 +666,9 @@ begin
       -- Sum of all retry attempts.
       total_retries number default 0,
       last_retry_time date default null,
-      message varchar2(1000)
+      message varchar2(1000),
+      -- ToDo: Add this.
+      enabled varchar2(1) default ''Y''
       )', false);
       execute_sql('alter table app_test add constraint pk_app_test primary key (test_name)', false);
    end if;

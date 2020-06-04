@@ -1575,15 +1575,6 @@ function init_app_test (p_test_name varchar2) return boolean is
    n number;
    time_to_test boolean := false;
 
-   function retries_not_configured return boolean is
-   begin 
-      if nvl(g_app_test_profile.retry_count, 0) = 0 then 
-         return true;
-      else 
-         return false;
-      end if;
-   end;
-
    function test_interval return boolean is 
    begin
       if nvl(g_app_test.test_end_time, sysdate) + g_app_test_profile.test_interval/1440 < sysdate then 
@@ -1639,16 +1630,9 @@ begin
    if g_app_test.test_status in ('RETRY') and retry_interval then 
       g_app_test.total_retries := g_app_test.total_retries + 1;
       g_app_test.retry_count := g_app_test.retry_count + 1;
-      g_app_test.last_retry_time := sysdate;
       time_to_test := true;
    end if;
-   if g_app_test.test_status in ('RETRY') and retries_not_configured then 
-      -- Should not happen unless user changes profile when a test is already in RETRY. Fix and continue.
-      g_app_test.total_failures := g_app_test.total_failures + 1;
-      g_app_test.test_status := 'FAIL';
-      save_app_test;
-   end if;
-   if g_app_test.test_status in ('FAIL') and (recheck_interval or test_interval) then 
+   if g_app_test.test_status in ('FAIL', 'ABANDON') and (recheck_interval or test_interval) then 
       time_to_test := true;
    end if;
    if g_app_test.test_status in ('PASS') and test_interval then 
@@ -1713,7 +1697,7 @@ procedure app_test_check is
 
 begin 
    raise_app_test_not_set;
-   if g_app_test.test_status = 'FAIL' then 
+   if g_app_test.test_status in ('FAIL') then 
       if abandon_interval then 
          abandon_test;
       elsif time_to_remind then 
@@ -1724,28 +1708,39 @@ end;
 
 procedure app_test_fail (p_message in varchar2 default null) is 
    initial_status varchar2(120);
+   
+   function retries_not_configured return boolean is
+   begin 
+      if nvl(g_app_test_profile.retry_count, 0) = 0 then 
+         return true;
+      else 
+         return false;
+      end if;
+   end;
+
+   procedure fail_app_test is 
+   begin 
+      g_app_test.test_status := 'FAIL';
+      g_app_test.failed_time := g_app_test.test_end_time;
+      g_app_test.last_reminder_time := g_app_test.test_end_time;
+      g_app_test.total_failures := g_app_test.total_failures + 1;
+   end;
+
 begin 
    raise_app_test_not_set;
    initial_status := g_app_test.test_status;
    g_app_test.test_end_time := sysdate;
    g_app_test.message := p_message;
    if g_app_test.test_status = 'PASS' then 
-      if g_app_test_profile.retry_count = 0 then 
-         g_app_test.failed_time := g_app_test.test_end_time;
-         g_app_test.last_reminder_time := g_app_test.test_end_time;
-         g_app_test.test_status := 'FAIL';
+      if retries_not_configured then 
+         fail_app_test;
       else
          g_app_test.test_status := 'RETRY';
       end if;
    elsif g_app_test.test_status = 'RETRY' then 
-      if g_app_test.retry_count >= g_app_test_profile.retry_count then 
-         g_app_test.test_status := 'FAIL';
-         g_app_test.failed_time := g_app_test.test_end_time;
-         g_app_test.last_reminder_time := g_app_test.test_end_time;
-         g_app_test.total_failures := g_app_test.total_failures + 1;
+      if nvl(g_app_test.retry_count, 0) >= g_app_test_profile.retry_count or retries_not_configured then 
+         fail_app_test;
       end if;
-   else -- Status can only be in FAIL or ABANDON.
-      null;
    end if;
    app_test_check;
    save_app_test;
