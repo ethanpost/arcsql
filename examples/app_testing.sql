@@ -65,6 +65,32 @@ begin
    arcsql.assert := arcsql.g_app_test.test_status = 'PASS';
    arcsql.test;
 
+   --
+   arcsql.init_test('App test expected to retry twice, then fail.');
+   arcsql.g_app_test_profile.retry_count := 2;
+   
+   if arcsql.init_app_test(p_test_name=>'bar') then 
+      arcsql.g_app_test.test_status := 'PASS';
+      arcsql.app_test_fail;
+      arcsql.app_test_fail;
+      if arcsql.g_app_test.test_status != 'RETRY' then 
+         arcsql.fail_test;
+      end if;
+      arcsql.app_test_fail;
+      if arcsql.g_app_test.test_status != 'FAIL' then 
+         arcsql.fail_test;
+      end if;
+   end if;
+   arcsql.pass_test;
+
+   --
+   arcsql.init_test('App test expected to pass again.');
+   if arcsql.init_app_test(p_test_name=>'bar') then
+      arcsql.app_test_pass;
+   end if;
+   arcsql.assert := arcsql.g_app_test.test_status = 'PASS';
+   arcsql.test;
+
 exception
    when others then
       arcsql.fail_test;
