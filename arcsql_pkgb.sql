@@ -306,7 +306,7 @@ begin
    else
       new_status := 'SET';
    end if;
-   
+
    if n = 0 then 
       insert into app_version (
          app_name,
@@ -392,15 +392,15 @@ procedure cache (
    p_value varchar2) is
    l_value varchar2(4000);
 begin
-   
+
    if not does_cache_key_exist(cache_key) then
       insert into cache (key) values (cache_key);
    end if;
-   
+
    if length(p_value) > 4000 then
       l_value := substr(p_value, 1, 4000);
    end if;
-   
+
    update cache 
       set value=p_value,
           update_time=sysdate
@@ -437,7 +437,7 @@ begin
    delete from cache
     where key=lower(cache_key);
 end;
-   
+
 /* CUSTOM SETTINGS */
 
 procedure remove_config (name varchar2) is
@@ -814,11 +814,11 @@ begin
    min_elap_secs := get_sql_log_analyze_min_secs;
    -- This is only allowed if you have the license to look at these tables.
    if upper(nvl(arcsql.get_config('sql_log_ash_is_licensed'), 'N')) = 'Y' then
-      
+
       if nvl(arcsql.return_cached_value('sql_log_last_active_sql_hist_update'), 'x') != to_char(sysdate, 'YYYYMMDDHH24') then
-      
+
          arcsql.cache('sql_log_last_active_sql_hist_update', to_char(sysdate, 'YYYYMMDDHH24'));
-         
+
          insert into sql_log_active_session_history (
          datetime,
          sql_id,
@@ -874,19 +874,19 @@ procedure sql_log_analyze_window (datetime date default sysdate) is
       and a.elapsed_seconds > min_elap_secs;
 
    total_elap_secs              number;
-   
+
 begin
    total_elap_secs := sql_log_elap_secs_all_sql(sql_log_analyze_window.datetime);
    -- Loop through each row in SQL_LOG in the result set.
    for s in c_sql_log (get_sql_log_analyze_min_secs) loop
-      
+
       -- We check for nulls below and only set once per hour. Once set we don't need to do it again.
 
       -- What is the historical avg elap time per exe in seconds for this SQL?
       if s.norm_elap_secs_per_exe is null then
          s.norm_elap_secs_per_exe := sql_log_norm_elap_secs_per_exe(datetime => sql_log_analyze_window.datetime, sqlid => s.sql_id, forcematchingsignature => s.force_matching_signature);
       end if;
-      
+
       -- What is the historical avg # of executes per hr for this SQL?
       if s.norm_execs_per_hour is null then
          s.norm_execs_per_hour := sql_log_norm_execs_per_hour(datetime=>sql_log_analyze_window.datetime, sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
@@ -899,7 +899,7 @@ begin
       if s.norm_rows_processed is null then 
          s.norm_rows_processed := sql_log_norm_rows_processed(datetime=>sql_log_analyze_window.datetime, sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
       end if;
-      
+
       if s.sql_age_in_days is null then
          s.sql_age_in_days := sql_log_age_of_sql_in_days(datetime=>sql_log_analyze_window.datetime, sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
       end if;
@@ -907,7 +907,7 @@ begin
       if s.hours_since_last_exe is null then 
          s.hours_since_last_exe := sql_log_hours_since_last_exe(sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
       end if;
-      
+
       if s.sql_last_seen_in_days is null then
          s.sql_last_seen_in_days := sql_log_sql_last_seen_in_days(datetime=>sql_log_analyze_window.datetime, sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
       end if;
@@ -915,7 +915,7 @@ begin
       if s.plan_age_in_days is null then
          s.plan_age_in_days := sql_log_age_of_plan_in_days(datetime=>sql_log_analyze_window.datetime, plan_hash_value=>s.plan_hash_value);
       end if;
-      
+
       s.faster_plans := sql_log_count_of_faster_plans(
          datetime=>s.datetime,
          elap_secs_per_exe=>s.elap_secs_per_exe,
@@ -923,7 +923,7 @@ begin
          plan_hash_value=>s.plan_hash_value,
          sqlid=>s.sql_id,
          forcematchingsignature=>s.force_matching_signature);
-         
+
       s.slower_plans := sql_log_count_of_slower_plans(
          datetime=>s.datetime,
          elap_secs_per_exe=>s.elap_secs_per_exe,
@@ -931,12 +931,12 @@ begin
          plan_hash_value=>s.plan_hash_value,
          sqlid=>s.sql_id,
          forcematchingsignature=>s.force_matching_signature);
-         
+
       s.elap_secs_per_exe_score := 0;
       if s.norm_elap_secs_per_exe > 0 then
          s.elap_secs_per_exe_score := round(s.elap_secs_per_exe/s.norm_elap_secs_per_exe*100);
       end if;
-          
+
       update sql_log
          set elap_secs_per_exe_score = s.elap_secs_per_exe_score,
              executions_score = decode(norm_execs_per_hour, 0, 0, round(s.executions/s.norm_execs_per_hour*100)),
@@ -965,7 +965,7 @@ begin
              sql_log_max_score = greatest(nvl(sql_log_max_score, sql_log_score), nvl(sql_log_score, sql_log_max_score)),
              sql_log_min_score = least(nvl(sql_log_min_score, sql_log_score), nvl(sql_log_score, sql_log_min_score))
        where sql_log_id = s.sql_log_id;
-       
+
    end loop;
 end;
 
@@ -1031,7 +1031,7 @@ procedure run_sql_log_update is
                          and a.force_matching_signature=b.force_matching_signature);
    n number;
    last_elap_secs_per_exe  number;
-   
+
 begin
    select count(*) into n from sql_snap where rownum < 2;
    if n = 0 then
@@ -1056,7 +1056,7 @@ begin
             and plan_hash_value=s.plan_hash_value
             and force_matching_signature=s.force_matching_signature
             and datetime=trunc(sysdate, 'HH24');
-         
+
          if sql%rowcount = 0 then
             -- This is a new SQL and we need to insert it.
             insert into sql_log (
@@ -1101,7 +1101,7 @@ begin
                s.module,
                s.action);
          end if;
-         
+
          if s.executions = 0 then
             last_elap_secs_per_exe := 0;
          else
@@ -1483,7 +1483,295 @@ begin
    arcsql.test_name := init_test.test_name;
 end;
 
+procedure add_app_test_profile (
+   p_profile_name in varchar2,
+   p_env_type in varchar2 default null,
+   p_test_interval in number default 0,
+   p_retry_count in number default 0,
+   p_retry_interval in number default 0,
+   p_retry_keyword in varchar2 default 'warning',
+   p_failed_keyword in varchar2 default 'warning',
+   p_reminder_interval in number default 60,
+   p_reminder_keyword in varchar2 default 'warning',
+   -- Changes reminder interval for each occurance by some number or %.
+   p_reminder_interval_change in varchar2 default null,
+   p_abandon_interval in varchar2 default null,
+   p_abandon_keyword in varchar2 default 'warning',
+   p_abandon_reset in varchar2 default 'N',
+   p_pass_keyword in varchar2 default 'passing'
+   ) is
+begin
+   if not does_test_profile_exist(p_profile_name, p_env_type) then
+      g_app_test_profile := null;
+      g_app_test_profile.profile_name := p_profile_name;
+      g_app_test_profile.env_type := p_env_type;
+      g_app_test_profile.test_interval := p_test_interval;
+      g_app_test_profile.retry_count := p_retry_count;
+      g_app_test_profile.retry_interval := p_retry_interval;
+      g_app_test_profile.retry_keyword := p_retry_keyword;
+      g_app_test_profile.failed_keyword := p_failed_keyword;
+      g_app_test_profile.reminder_interval := p_reminder_interval;
+      g_app_test_profile.reminder_keyword := p_reminder_keyword;
+      g_app_test_profile.reminder_interval_change := p_reminder_interval_change;
+      g_app_test_profile.abandon_interval := p_abandon_interval;
+      g_app_test_profile.abandon_keyword := p_abandon_keyword;
+      g_app_test_profile.abandon_reset := p_abandon_reset;
+      g_app_test_profile.pass_keyword := p_pass_keyword;
+      save_app_test_profile;
+   end if;
 end;
-/
 
-show errors
+procedure set_app_test_profile (
+   p_profile_name in varchar2,
+   p_env_type in varchar2) is 
+begin 
+   select * into g_app_test_profile 
+     from app_test_profile 
+    where profile_name=p_profile_name
+      and env_type=p_env_type;
+end;
+
+procedure save_app_test_profile is 
+begin  
+   update app_test_profile set row=g_app_test_profile where profile_name=g_app_test_profile.profile_name;
+   if sql%rowcount = 0 then 
+      insert into app_test_profile values g_app_test_profile;
+   end if;
+   commit;
+end;
+
+function does_test_profile_exist(
+   p_profile_name in varchar2,
+   p_env_type in varchar2) return boolean is 
+   n number;
+begin 
+   select count(*) into n 
+     from app_test_profile 
+    where profile_name=p_profile_name 
+      and env_type=p_env_type;
+   if n > 0 then 
+      return true;
+   else 
+      return false;
+   end if;
+end;
+
+procedure raise_test_profile_not_set is 
+begin 
+   if g_app_test_profile.profile_name is null then 
+      raise_application_error('-20001', 'Application test profile not set.');
+   end if;
+end;
+
+procedure raise_app_test_not_set is 
+begin
+   if g_app_test.test_name is null then 
+      raise_application_error('-20001', 'Application test not set.');
+   end if;
+end;
+
+function init_app_test (p_test_name varchar2) return boolean is
+   pragma autonomous_transaction;
+   n number;
+   time_to_test boolean := false;
+
+   function retries_not_configured return boolean is
+   begin 
+      if nvl(g_app_test_profile.retry_count, 0) = 0 then 
+         return true;
+      else 
+         return false;
+      end if;
+   end;
+
+   function test_interval return boolean is 
+   begin
+      if nvl(g_app_test.test_end_time, sysdate) + g_app_test_profile.test_interval/1440 < sysdate then 
+         return true;
+      else 
+         return false;
+      end if;
+   end;
+
+   function retry_interval return boolean is 
+   begin 
+      if g_app_test.test_end_time + g_app_test_profile.retry_interval/1440 < sysdate then
+         return true;
+      else
+         return false;
+      end if;
+   end;
+
+   function recheck_interval return boolean is 
+   begin 
+      if nvl(g_app_test_profile.recheck_interval, -1) > -1 then 
+         if g_app_test.test_end_time + g_app_test_profile.recheck_interval/1440 < sysdate then 
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+begin
+   arcsql.debug('app_test: '||p_test_name);
+   raise_test_profile_not_set;
+   select count(*) into n from app_test 
+    where test_name=p_test_name;
+   if n = 0 then 
+      insert into app_test (
+         test_name,
+         test_start_time,
+         test_end_time,
+         reminder_interval) values (
+         p_test_name,
+         sysdate,
+         null,
+         g_app_test_profile.reminder_interval);
+      commit;
+      time_to_test := true;
+   end if;
+   select * into g_app_test from app_test where test_name=p_test_name;
+   if not g_app_test.test_start_time is null and 
+      g_app_test.test_end_time is null then 
+      -- ToDo: Log an error here but do not throw an error.
+      null;
+   end if;
+   if g_app_test.test_status in ('RETRY') and retry_interval then 
+      g_app_test.total_retries := g_app_test.total_retries + 1;
+      g_app_test.retry_count := g_app_test.retry_count + 1;
+      g_app_test.last_retry_time := sysdate;
+      time_to_test := true;
+   end if;
+   if g_app_test.test_status in ('RETRY') and retries_not_configured then 
+      -- Should not happen unless user changes profile when a test is already in RETRY. Fix and continue.
+      g_app_test.total_failures := g_app_test.total_failures + 1;
+      g_app_test.test_status := 'FAIL';
+      save_app_test;
+   end if;
+   if g_app_test.test_status in ('FAIL') and (recheck_interval or test_interval) then 
+      time_to_test := true;
+   end if;
+   if g_app_test.test_status in ('PASS') and test_interval then 
+      time_to_test := true;
+   end if;
+   if time_to_test then 
+      g_app_test.test_start_time := sysdate;
+      g_app_test.test_end_time := null;
+      g_app_test.total_test_count := g_app_test.total_test_count + 1;
+      save_app_test;
+      return true;
+   else 
+      return false;
+   end if;
+end;
+
+procedure app_test_check is 
+
+   function abandon_interval return boolean is 
+   begin 
+      if nvl(g_app_test_profile.abandon_interval, 0) > 0 then 
+         if g_app_test.failed_time + g_app_test_profile.abandon_interval/1440 < sysdate then 
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+   procedure abandon_test is 
+   begin 
+      g_app_test.abandon_time := sysdate;
+      g_app_test.total_abandons := g_app_test.total_abandons + 1;
+      arcsql.log(
+         log_text=>'['||g_app_test_profile.abandon_keyword||'] '||g_app_test.test_name||' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
+         log_key=>'app_test');
+      if nvl(g_app_test_profile.abandon_reset, 'N') = 'N' then 
+         g_app_test.test_status := 'ABANDON';
+      else 
+         g_app_test.test_status := 'PASS';
+      end if;
+   end;
+
+   function time_to_remind return boolean is 
+   begin 
+      if nvl(g_app_test.reminder_interval, 0) > 0 and g_app_test.test_status in ('FAIL') then  
+         if g_app_test.last_reminder_time + g_app_test.reminder_interval/1440 < sysdate then
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+   procedure log_reminder is 
+   begin 
+      g_app_test.last_reminder_time := sysdate;
+      g_app_test.reminder_count := g_app_test.reminder_count + 1;
+      g_app_test.total_reminders := g_app_test.total_reminders + 1;
+      arcsql.log(
+         log_text=>'['||g_app_test_profile.reminder_keyword||'] '||g_app_test.test_name||' is still failing.',
+         log_key=>'app_test');
+   end;
+
+begin 
+   raise_app_test_not_set;
+   if g_app_test.test_status = 'FAIL' then 
+      if abandon_interval then 
+         abandon_test;
+      elsif time_to_remind then 
+         log_reminder;
+      end if;
+   end if;
+end;
+
+procedure app_test_fail (p_message in varchar2 default null) is 
+   initial_status varchar2(120);
+begin 
+   raise_app_test_not_set;
+   initial_status := g_app_test.test_status;
+   g_app_test.test_end_time := sysdate;
+   g_app_test.message := p_message;
+   if g_app_test.test_status = 'PASS' then 
+      if g_app_test_profile.retry_count = 0 then 
+         g_app_test.failed_time := g_app_test.test_end_time;
+         g_app_test.last_reminder_time := g_app_test.test_end_time;
+         g_app_test.test_status := 'FAIL';
+      else
+         g_app_test.test_status := 'RETRY';
+      end if;
+   elsif g_app_test.test_status = 'RETRY' then 
+      if g_app_test.retry_count >= g_app_test_profile.retry_count then 
+         g_app_test.test_status := 'FAIL';
+         g_app_test.failed_time := g_app_test.test_end_time;
+         g_app_test.last_reminder_time := g_app_test.test_end_time;
+         g_app_test.total_failures := g_app_test.total_failures + 1;
+      end if;
+   else -- Status can only be in FAIL or ABANDON.
+      null;
+   end if;
+   app_test_check;
+   save_app_test;
+end;
+
+procedure app_test_pass is 
+   initial_status varchar2(120);
+begin 
+   raise_app_test_not_set;
+   initial_status := g_app_test.test_status;
+   g_app_test.test_end_time := sysdate;
+   if g_app_test.test_status != 'PASS' then 
+      g_app_test.test_status := 'PASS';
+      g_app_test.passed_time := g_app_test.test_end_time;
+      g_app_test.reminder_count := 0;
+      g_app_test.reminder_interval := 0;
+      g_app_test.retry_count := 0;
+   end if;
+   save_app_test;
+end;
+
+procedure save_app_test is 
+   pragma autonomous_transaction;
+begin 
+   update app_test set row=g_app_test where test_name=g_app_test.test_name;
+   commit;
+end;
+
+end;

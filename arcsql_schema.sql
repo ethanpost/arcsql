@@ -602,3 +602,73 @@ create or replace view database_users as (
 select username, account_status, lock_date, created, password_change_date 
   from dba_users);
 
+-- uninstall: drop table test_profile cascade constraints purge;
+drop table app_test_profile;
+begin
+   if not does_table_exist('app_test_profile') then 
+      execute_sql('
+      create table app_test_profile (
+      profile_name varchar2(120),
+      -- Environment type, can be something like prod, dev, test...
+      env_type varchar2(120) default null,
+      test_interval number default 0,
+      -- If test is in FAIL or ABANDON we can recheck for PASS more frequently or less using 
+      -- the recheck_interval which has precedence over test_interval.
+      recheck_interval number default null,
+      -- The number of times to retry before failing.
+      retry_count number default 0 not null,
+      -- The interval to wait before allowing a retry, if null then test_interval is used.
+      retry_interval number default 0 not null,
+      -- Keyword to log when a retry is attempted.
+      retry_keyword varchar2(120) default null,
+      -- Keyword to log when state changes to failed.
+      failed_keyword varchar2(120),
+      -- Interval to wait between reminders. If null reminders are not sent.
+      reminder_interval number default null,
+      -- Keyword to log when a reminder is sent.
+      reminder_keyword varchar2(120),
+      -- Dynamically change the interval each time the reminder runs by some # or %.
+      reminder_interval_change varchar2(120),
+      -- Interval to wait before test is abandoned (test is still run but no reporting takes place if it continues to fail.)
+      abandon_interval number default null,
+      -- Keyword to log when abandon occurs.
+      abandon_keyword varchar2(120) default null,
+      -- If Y test resets automatically to passing on abandon.
+      abandon_reset varchar2(1) default ''N'',
+      -- Keyword to log when test changes from fail to pass.
+      pass_keyword varchar2(120))', false);
+      execute_sql('create index test_profile_1 on app_test_profile (profile_name)', false);
+    end if;
+end;
+/
+
+-- uninstall: drop table app_test cascade constraints purge;
+drop table app_test;
+begin
+   if not does_table_exist('app_test') then 
+      execute_sql('
+      create table app_test (
+      test_name varchar2(120) not null,
+      test_status varchar2(120) default ''PASS'',
+      passed_time date default null,
+      failed_time date default null,
+      test_start_time date default null,
+      test_end_time date default null,
+      total_test_count number default 0,
+      total_failures number default 0,
+      last_reminder_time date default null,
+      reminder_interval number default null,
+      reminder_count number default 0,
+      total_reminders number default 0,
+      abandon_time date default null,
+      total_abandons number default 0,
+      retry_count number default 0,
+      -- Sum of all retry attempts.
+      total_retries number default 0,
+      last_retry_time date default null,
+      message varchar2(1000)
+      )', false);
+      execute_sql('alter table app_test add constraint pk_app_test primary key (test_name)', false);
+   end if;
+end;
+/
