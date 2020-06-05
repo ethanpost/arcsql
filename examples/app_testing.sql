@@ -86,18 +86,46 @@ begin
    arcsql.pass_test;
 
    -- 
-    arcsql.init_test('Add a new default profile for null env type.');
-    arcsql.add_app_test_profile (
-       p_profile_name=>'default',
-       p_env_type=>null,
-       p_is_default=>'Y');
-    arcsql.g_app_test_profile.test_interval := 5;
-    arcsql.save_app_test_profile;
-    arcsql.pass_test;
+   arcsql.init_test('Add a new default profile for null env type.');
+   arcsql.add_app_test_profile (
+      p_profile_name=>'default',
+      p_env_type=>null,
+      p_is_default=>'Y');
+   arcsql.g_app_test_profile.test_interval := 5;
+   arcsql.save_app_test_profile;
+   select count(*) into n from app_test_profile where is_default='Y' having count(*)=2;
+   arcsql.pass_test;
 
-    --
-    arcsql.init_test('** Success** ');
-    arcsql.pass_test;
+   --
+   arcsql.init_test('Adding a profile a second time does not update it.');
+   arcsql.add_app_test_profile (
+      p_profile_name=>'default',
+      p_env_type=>null,
+      p_is_default=>'Y',
+      p_test_interval=>6);
+   arcsql.set_app_test_profile('default');
+   if arcsql.g_app_test_profile.test_interval=5 then 
+      arcsql.pass_test;
+   else 
+      arcsql.fail_test;
+   end if;
+
+   -- 
+   arcsql.init_test('Correct way to update a profile in the app_test_profile table.');
+   arcsql.g_app_test_profile.test_interval := 6;
+   arcsql.save_app_test_profile;
+   arcsql.g_app_test_profile := null;
+   arcsql.set_app_test_profile('default');
+   if arcsql.g_app_test_profile.test_interval=6 then 
+      arcsql.pass_test;
+   else 
+      arcsql.fail_test;
+   end if;
+
+
+   -- 
+   arcsql.init_test('** Success** ');
+   arcsql.pass_test;
 
 exception 
    when others then 
