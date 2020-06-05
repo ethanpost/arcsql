@@ -1577,7 +1577,7 @@ function init_app_test (p_test_name varchar2) return boolean is
 
    function test_interval return boolean is 
    begin
-      if nvl(g_app_test.test_end_time, sysdate) + g_app_test_profile.test_interval/1440 < sysdate then 
+      if nvl(g_app_test.test_end_time, sysdate-999) + g_app_test_profile.test_interval/1440 < sysdate then 
          return true;
       else 
          return false;
@@ -1747,12 +1747,10 @@ begin
 end;
 
 procedure app_test_pass is 
-   initial_status varchar2(120);
 begin 
    raise_app_test_not_set;
-   initial_status := g_app_test.test_status;
    g_app_test.test_end_time := sysdate;
-   if g_app_test.test_status != 'PASS' then 
+   if g_app_test.test_status not in ('PASS') or g_app_test.passed_time is null then 
       g_app_test.test_status := 'PASS';
       g_app_test.passed_time := g_app_test.test_end_time;
       g_app_test.reminder_count := 0;

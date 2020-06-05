@@ -41,8 +41,6 @@ begin
    --
    arcsql.init_test('Create a simple test.');
    arcsql.set_app_test_profile(p_profile_name=>'foo', p_env_type=>'test');
-   delete from app_test where test_name='bar';
-   commit;
    if arcsql.init_app_test(p_test_name=>'bar') then
       arcsql.pass_test;
    else 
