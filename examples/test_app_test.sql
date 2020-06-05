@@ -243,7 +243,6 @@ exception
 end;
 /
 
-
 -- exec test_app_test_profiles;
 exec test_basic_app_profile_features;
 
