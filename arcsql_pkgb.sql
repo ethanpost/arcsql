@@ -1535,11 +1535,6 @@ begin
       g_app_test_profile.abandon_reset := p_abandon_reset;
       g_app_test_profile.pass_keyword := p_pass_keyword;
       save_app_test_profile;
-      if p_is_default = 'Y' then 
-         update app_test_profile set is_default='N'
-          where profile_name=p_profile_name 
-            and nvl(env_type, 'x')=nvl(p_env_type, 'x');
-      end if;
    end if;
 end;
 
@@ -1586,15 +1581,33 @@ begin
    raise_application_error('-20001', 'Matching app profile not found.');
 end;
 
+procedure raise_app_test_profile_not_set is 
+begin 
+   if app_test_profile_not_set then 
+      raise_application_error('-20001', 'Application test profile not set.');
+   end if;
+end;
+
 procedure save_app_test_profile is 
   pragma autonomous_transaction;
 begin  
+   raise_app_test_profile_not_set;
+
+   -- Each env type can only have one default profile associated with it.
+   if arcsql.g_app_test_profile.is_default='Y' then 
+      update app_test_profile set is_default='N'
+       where is_default='Y' 
+         and nvl(env_type, 'x')=nvl(g_app_test_profile.env_type, 'x');
+   end if;
+
    update app_test_profile set row=g_app_test_profile 
     where profile_name=g_app_test_profile.profile_name
       and nvl(env_type, 'x')=nvl(g_app_test_profile.env_type, 'x');
+
    if sql%rowcount = 0 then 
       insert into app_test_profile values g_app_test_profile;
    end if;
+
    commit;
 end;
 
@@ -1611,13 +1624,6 @@ begin
       return true;
    else 
       return false;
-   end if;
-end;
-
-procedure raise_app_test_profile_not_set is 
-begin 
-   if app_test_profile_not_set then 
-      raise_application_error('-20001', 'Application test profile not set.');
    end if;
 end;
 
