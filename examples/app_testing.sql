@@ -13,12 +13,10 @@ begin
    
    -- 
    arcsql.init_test('App test profile exists.');
-   arcsql.add_app_test_profile(
-      p_profile_name=>'foo',
-      p_env_type=>'test');
+   arcsql.add_app_test_profile(p_profile_name=>'foo');
    arcsql.g_app_test_profile.test_interval := 0;
    arcsql.save_app_test_profile;
-   select 1 into n from app_test_profile where profile_name='foo';
+   select 1 into n from app_test_profile where profile_name='foo' and env_type is null;
    arcsql.pass_test;
    
    --
@@ -38,9 +36,13 @@ begin
          arcsql.pass_test;
    end;
    
+   -- 
+   arcsql.init_test('Set profile to foo even when env_type not found.');
+   arcsql.set_app_test_profile(p_profile_name=>'foo', p_env_type=>'x');
+   
    --
    arcsql.init_test('Create a simple test.');
-   arcsql.set_app_test_profile(p_profile_name=>'foo', p_env_type=>'test');
+   arcsql.set_app_test_profile(p_profile_name=>'foo');
    if arcsql.init_app_test(p_test_name=>'bar') then
       arcsql.pass_test;
    else 

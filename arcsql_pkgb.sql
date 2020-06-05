@@ -1483,9 +1483,25 @@ begin
    arcsql.test_name := init_test.test_name;
 end;
 
+ /* 
+ -----------------------------------------------------------------------------------
+ Application Test Framework
+ -----------------------------------------------------------------------------------
+ */
+
+function app_test_profile_not_set return boolean is 
+begin 
+   if g_app_test_profile.profile_name is null then 
+      return true;
+   else 
+      return false;
+   end if;
+end;
+
 procedure add_app_test_profile (
    p_profile_name in varchar2,
    p_env_type in varchar2 default null,
+   p_is_default in varchar2 default 'N',
    p_test_interval in number default 0,
    p_retry_count in number default 0,
    p_retry_interval in number default 0,
@@ -1501,10 +1517,11 @@ procedure add_app_test_profile (
    p_pass_keyword in varchar2 default 'passing'
    ) is
 begin
-   if not does_test_profile_exist(p_profile_name, p_env_type) then
+   if not does_app_test_profile_exist(p_profile_name, p_env_type) then
       g_app_test_profile := null;
       g_app_test_profile.profile_name := p_profile_name;
       g_app_test_profile.env_type := p_env_type;
+      g_app_test_profile.is_default := p_is_default;
       g_app_test_profile.test_interval := p_test_interval;
       g_app_test_profile.retry_count := p_retry_count;
       g_app_test_profile.retry_interval := p_retry_interval;
@@ -1518,37 +1535,78 @@ begin
       g_app_test_profile.abandon_reset := p_abandon_reset;
       g_app_test_profile.pass_keyword := p_pass_keyword;
       save_app_test_profile;
+      if p_is_default = 'Y' then 
+         update app_test_profile set is_default='N'
+          where profile_name=p_profile_name 
+            and nvl(env_type, 'x')=nvl(p_env_type, 'x');
+      end if;
    end if;
 end;
 
 procedure set_app_test_profile (
-   p_profile_name in varchar2,
-   p_env_type in varchar2) is 
+   p_profile_name in varchar2 default null,
+   p_env_type in varchar2 default null) is 
+   -- Set g_app_test_profile. If env type not found try where env type is null.
+   n number;
+   
+   function set_exact_app_profile return boolean is 
+   -- Match profile name and env type (could be null).
+   begin 
+      select * into g_app_test_profile 
+        from app_test_profile 
+       where profile_name=p_profile_name 
+         and nvl(env_type, 'x')=nvl(p_env_type, 'x');
+      return true;
+   exception 
+      when others then 
+         return false;
+   end;
+
+   function set_default_app_profile return boolean is 
+   -- Match default profile if configured.
+   begin 
+      select * into g_app_test_profile 
+        from app_test_profile 
+       where is_default='Y'
+         and 'x'=nvl(p_profile_name, 'x')
+         and 'x'=nvl(p_env_type, 'x');
+      return true;
+   exception 
+      when others then 
+         return false;
+   end;
+
 begin 
-   select * into g_app_test_profile 
-     from app_test_profile 
-    where profile_name=p_profile_name
-      and env_type=p_env_type;
+   if set_exact_app_profile then 
+      return;
+   end if;
+   if set_default_app_profile then 
+      return;
+   end if;
+   raise_application_error('-20001', 'Matching app profile not found.');
 end;
 
 procedure save_app_test_profile is 
+  pragma autonomous_transaction;
 begin  
-   update app_test_profile set row=g_app_test_profile where profile_name=g_app_test_profile.profile_name;
+   update app_test_profile set row=g_app_test_profile 
+    where profile_name=g_app_test_profile.profile_name
+      and nvl(env_type, 'x')=nvl(g_app_test_profile.env_type, 'x');
    if sql%rowcount = 0 then 
       insert into app_test_profile values g_app_test_profile;
    end if;
    commit;
 end;
 
-function does_test_profile_exist(
+function does_app_test_profile_exist (
    p_profile_name in varchar2,
-   p_env_type in varchar2) return boolean is 
+   p_env_type in varchar2 default null) return boolean is 
    n number;
 begin 
    select count(*) into n 
      from app_test_profile 
-    where profile_name=p_profile_name 
-      and env_type=p_env_type;
+    where profile_name=p_profile_name
+      and nvl(env_type, 'x')=nvl(p_env_type, 'x');
    if n > 0 then 
       return true;
    else 
@@ -1556,11 +1614,18 @@ begin
    end if;
 end;
 
-procedure raise_test_profile_not_set is 
+procedure raise_app_test_profile_not_set is 
 begin 
-   if g_app_test_profile.profile_name is null then 
+   if app_test_profile_not_set then 
       raise_application_error('-20001', 'Application test profile not set.');
    end if;
+end;
+
+procedure set_default_app_test_profile is 
+   n number;
+begin 
+   -- Try to set default by calling set with no parms.
+   set_app_test_profile;
 end;
 
 procedure raise_app_test_not_set is 
@@ -1605,7 +1670,10 @@ function init_app_test (p_test_name varchar2) return boolean is
 
 begin
    arcsql.debug('app_test: '||p_test_name);
-   raise_test_profile_not_set;
+   if app_test_profile_not_set then 
+      set_default_app_test_profile;
+   end if;
+   raise_app_test_profile_not_set;
    select count(*) into n from app_test 
     where test_name=p_test_name;
    if n = 0 then 
@@ -1650,8 +1718,10 @@ begin
 end;
 
 procedure app_test_check is 
+   -- Sends reminders and changes status to ABANDON when test status is currently FAIL.
 
    function abandon_interval return boolean is 
+   -- Returns true if it is time to abandon this test.
    begin 
       if nvl(g_app_test_profile.abandon_interval, 0) > 0 then 
          if g_app_test.failed_time + g_app_test_profile.abandon_interval/1440 < sysdate then 
@@ -1662,13 +1732,14 @@ procedure app_test_check is
    end;
 
    procedure abandon_test is 
+   -- Performs necessary actions when test status changes to 'ABANDON'.
    begin 
       g_app_test.abandon_time := sysdate;
       g_app_test.total_abandons := g_app_test.total_abandons + 1;
       arcsql.log(
          log_text=>'['||g_app_test_profile.abandon_keyword||'] '||g_app_test.test_name||' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
-         log_key=>'app_test',
-         log_level=>0);
+         log_key=>'app_test');
+      -- If reset is Y the test changes back to PASS and will likely FAIL on the next check and cycle through the whole process again.
       if nvl(g_app_test_profile.abandon_reset, 'N') = 'N' then 
          g_app_test.test_status := 'ABANDON';
       else 
@@ -1677,6 +1748,7 @@ procedure app_test_check is
    end;
 
    function time_to_remind return boolean is 
+   -- Return true if it is time to log a reminder for a FAIL'd test.
    begin 
       if nvl(g_app_test.reminder_interval, 0) > 0 and g_app_test.test_status in ('FAIL') then  
          if g_app_test.last_reminder_time + g_app_test.reminder_interval/1440 < sysdate then
@@ -1686,15 +1758,15 @@ procedure app_test_check is
       return false;
    end;
 
-   procedure log_reminder is 
+   procedure do_app_test_reminder is 
+   -- Perform actions required when it is time to send a reminder.
    begin 
       g_app_test.last_reminder_time := sysdate;
       g_app_test.reminder_count := g_app_test.reminder_count + 1;
       g_app_test.total_reminders := g_app_test.total_reminders + 1;
       arcsql.log(
          log_text=>'['||g_app_test_profile.reminder_keyword||'] '||g_app_test.test_name||' is still failing.',
-         log_key=>'app_test',
-         log_level=>0);
+         log_key=>'app_test');
    end;
 
 begin 
@@ -1703,7 +1775,7 @@ begin
       if abandon_interval then 
          abandon_test;
       elsif time_to_remind then 
-         log_reminder;
+         do_app_test_reminder;
       end if;
    end if;
 end;
@@ -1712,6 +1784,7 @@ procedure app_test_fail (p_message in varchar2 default null) is
    -- Called by the test developer anytime the app test fails.
    
    function retries_not_configured return boolean is
+   -- Return true if retries are configured for the currently set app test profile.
    begin 
       if nvl(g_app_test_profile.retry_count, 0) = 0 then 
          return true;
@@ -1721,6 +1794,7 @@ procedure app_test_fail (p_message in varchar2 default null) is
    end;
 
    procedure do_app_test_fail is 
+   -- Perform the actions required when a test status changes to FAIL.
    begin 
       g_app_test.test_status := 'FAIL';
       g_app_test.failed_time := g_app_test.test_end_time;
@@ -1728,8 +1802,7 @@ procedure app_test_fail (p_message in varchar2 default null) is
       g_app_test.total_failures := g_app_test.total_failures + 1;
       arcsql.log(
          log_text=>'['||g_app_test_profile.failed_keyword||'] '||g_app_test.test_name||' failed.',
-         log_key=>'app_test',);
-         log_level=>0
+         log_key=>'app_test');
    end;
 
 begin 
@@ -1763,8 +1836,7 @@ procedure app_test_pass is
       g_app_test.retry_count := 0;
       arcsql.log(
          log_text=>'['||g_app_test_profile.pass_keyword||'] '''||g_app_test.test_name||''' test passed.',
-         log_key=>'app_test',
-         log_level=>0);
+         log_key=>'app_test');
    end;
 
 begin 

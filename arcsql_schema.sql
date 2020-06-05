@@ -611,6 +611,7 @@ begin
       profile_name varchar2(120),
       -- Environment type, can be something like prod, dev, test...
       env_type varchar2(120) default null,
+      is_default varchar2(1) default ''N'',
       test_interval number default 0,
       -- If test is in FAIL or ABANDON we can recheck for PASS more frequently or less using 
       -- the recheck_interval which has precedence over test_interval.
@@ -637,7 +638,7 @@ begin
       abandon_reset varchar2(1) default ''N'',
       -- Keyword to log when test changes from fail to pass.
       pass_keyword varchar2(120))', false);
-      execute_sql('create index test_profile_1 on app_test_profile (profile_name)', false);
+      execute_sql('create index test_profile_1 on app_test_profile (profile_name, env_type)', false);
     end if;
 end;
 /
