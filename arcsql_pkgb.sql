@@ -1667,7 +1667,8 @@ procedure app_test_check is
       g_app_test.total_abandons := g_app_test.total_abandons + 1;
       arcsql.log(
          log_text=>'['||g_app_test_profile.abandon_keyword||'] '||g_app_test.test_name||' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
-         log_key=>'app_test');
+         log_key=>'app_test',
+         log_level=>0);
       if nvl(g_app_test_profile.abandon_reset, 'N') = 'N' then 
          g_app_test.test_status := 'ABANDON';
       else 
@@ -1692,7 +1693,8 @@ procedure app_test_check is
       g_app_test.total_reminders := g_app_test.total_reminders + 1;
       arcsql.log(
          log_text=>'['||g_app_test_profile.reminder_keyword||'] '||g_app_test.test_name||' is still failing.',
-         log_key=>'app_test');
+         log_key=>'app_test',
+         log_level=>0);
    end;
 
 begin 
@@ -1707,7 +1709,7 @@ begin
 end;
 
 procedure app_test_fail (p_message in varchar2 default null) is 
-   initial_status varchar2(120);
+   -- Called by the test developer anytime the app test fails.
    
    function retries_not_configured return boolean is
    begin 
@@ -1718,28 +1720,31 @@ procedure app_test_fail (p_message in varchar2 default null) is
       end if;
    end;
 
-   procedure fail_app_test is 
+   procedure do_app_test_fail is 
    begin 
       g_app_test.test_status := 'FAIL';
       g_app_test.failed_time := g_app_test.test_end_time;
       g_app_test.last_reminder_time := g_app_test.test_end_time;
       g_app_test.total_failures := g_app_test.total_failures + 1;
+      arcsql.log(
+         log_text=>'['||g_app_test_profile.failed_keyword||'] '||g_app_test.test_name||' failed.',
+         log_key=>'app_test',);
+         log_level=>0
    end;
 
 begin 
    raise_app_test_not_set;
-   initial_status := g_app_test.test_status;
    g_app_test.test_end_time := sysdate;
    g_app_test.message := p_message;
    if g_app_test.test_status = 'PASS' then 
       if retries_not_configured then 
-         fail_app_test;
+         do_app_test_fail;
       else
          g_app_test.test_status := 'RETRY';
       end if;
    elsif g_app_test.test_status = 'RETRY' then 
       if nvl(g_app_test.retry_count, 0) >= g_app_test_profile.retry_count or retries_not_configured then 
-         fail_app_test;
+         do_app_test_fail;
       end if;
    end if;
    app_test_check;
@@ -1747,15 +1752,26 @@ begin
 end;
 
 procedure app_test_pass is 
-begin 
-   raise_app_test_not_set;
-   g_app_test.test_end_time := sysdate;
-   if g_app_test.test_status not in ('PASS') or g_app_test.passed_time is null then 
+   -- Called by the test developer anytime the app test passes.
+   
+   procedure do_app_pass_test is 
+   begin 
       g_app_test.test_status := 'PASS';
       g_app_test.passed_time := g_app_test.test_end_time;
       g_app_test.reminder_count := 0;
       g_app_test.reminder_interval := 0;
       g_app_test.retry_count := 0;
+      arcsql.log(
+         log_text=>'['||g_app_test_profile.pass_keyword||'] '''||g_app_test.test_name||''' test passed.',
+         log_key=>'app_test',
+         log_level=>0);
+   end;
+
+begin 
+   raise_app_test_not_set;
+   g_app_test.test_end_time := sysdate;
+   if g_app_test.test_status not in ('PASS') or g_app_test.passed_time is null then 
+      do_app_pass_test;
    end if;
    save_app_test;
 end;
