@@ -8,7 +8,6 @@ Application Profile Tests
 create or replace procedure test_app_test_profiles is 
    n number;
 begin 
-   return;
    --
    arcsql.init_test('Use default profile when defined.');
    
@@ -130,7 +129,7 @@ begin
    end if;
 
    -- 
-   arcsql.init_test('** Success** ');
+   arcsql.init_test('** END **');
    arcsql.pass_test;
 
 exception 
@@ -234,7 +233,7 @@ begin
    arcsql.test;
 
    -- 
-   arcsql.init_test('Basic Features Success');
+   arcsql.init_test('** End **');
    arcsql.pass_test;
 
 exception
@@ -243,7 +242,7 @@ exception
 end;
 /
 
--- exec test_app_test_profiles;
+exec test_app_test_profiles;
 exec test_basic_app_profile_features;
 
 
