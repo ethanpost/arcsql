@@ -185,8 +185,7 @@ create or replace package arcsql as
       p_failed_keyword in varchar2 default 'warning',
       p_reminder_interval in number default 60,
       p_reminder_keyword in varchar2 default 'warning',
-      -- Changes reminder interval for each occurance by some number or %.
-      p_reminder_interval_change in varchar2 default null,
+      p_reminder_backoff in number default 1,
       p_abandon_interval in varchar2 default null,
       p_abandon_keyword in varchar2 default 'abandon',
       p_abandon_reset in varchar2 default 'N',

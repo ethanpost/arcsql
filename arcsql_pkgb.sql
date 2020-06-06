@@ -1506,8 +1506,8 @@ procedure add_app_test_profile (
    p_failed_keyword in varchar2 default 'warning',
    p_reminder_interval in number default 60,
    p_reminder_keyword in varchar2 default 'warning',
-   -- Changes reminder interval for each occurance by some number or %.
-   p_reminder_interval_change in varchar2 default null,
+   -- Interval is multiplied by this # each time a reminder is sent to set the next interval.
+   p_reminder_backoff in number default 1,
    p_abandon_interval in varchar2 default null,
    p_abandon_keyword in varchar2 default 'abandon',
    p_abandon_reset in varchar2 default 'N',
@@ -1527,7 +1527,7 @@ begin
       g_app_test_profile.failed_keyword := p_failed_keyword;
       g_app_test_profile.reminder_interval := p_reminder_interval;
       g_app_test_profile.reminder_keyword := p_reminder_keyword;
-      g_app_test_profile.reminder_interval_change := p_reminder_interval_change;
+      g_app_test_profile.reminder_backoff := p_reminder_backoff;
       g_app_test_profile.abandon_interval := p_abandon_interval;
       g_app_test_profile.abandon_keyword := p_abandon_keyword;
       g_app_test_profile.abandon_reset := p_abandon_reset;
@@ -1769,19 +1769,9 @@ procedure app_test_check is
       end if;
    end;
 
-   procedure change_next_reminder_interval is 
-      i number;
+   procedure set_next_reminder_interval is 
    begin 
-      if not g_app_test_profile.reminder_interval_change is null then 
-         if instr(g_app_test_profile.reminder_interval_change, '%') > 0 then
-            i := to_number(replace(g_app_test_profile.reminder_interval_change, '%'));
-            g_app_test_profile.reminder_interval := round(g_app_test_profile.reminder_interval * (i/100), 1);
-         else 
-            i := to_number(g_app_test_profile.reminder_interval_change);
-            g_app_test_profile.reminder_interval := round(g_app_test_profile.reminder_interval + i, 1);
-         end if;
-         save_app_test;
-      end if;
+      g_app_test.reminder_interval := g_app_test.reminder_interval * g_app_test_profile.reminder_backoff;
    end;
 
    function time_to_remind return boolean is 
@@ -1789,7 +1779,7 @@ procedure app_test_check is
    begin 
       if nvl(g_app_test.reminder_interval, 0) > 0 and g_app_test.test_status in ('FAIL') then  
          if g_app_test.last_reminder_time + g_app_test.reminder_interval/1440 <= sysdate then
-            change_next_reminder_interval;
+            set_next_reminder_interval;
             return true;
          end if;
       end if;
@@ -1818,6 +1808,7 @@ begin
          do_app_test_reminder;
       end if;
    end if;
+   save_app_test;
 end;
 
 procedure app_test_fail (p_message in varchar2 default null) is 

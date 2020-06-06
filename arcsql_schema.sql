@@ -629,7 +629,7 @@ begin
       -- Keyword to log when a reminder is sent.
       reminder_keyword varchar2(120),
       -- Dynamically change the interval each time the reminder runs by some # or %.
-      reminder_interval_change varchar2(120),
+      reminder_backoff number default 1 not null,
       -- Interval to wait before test is abandoned (test is still run but no reporting takes place if it continues to fail.)
       abandon_interval number default null,
       -- Keyword to log when abandon occurs.
