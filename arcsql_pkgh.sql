@@ -1,8 +1,5 @@
 create or replace package arcsql as
 
-   g_app_test_profile app_test_profile%rowtype;
-   g_app_test app_test%rowtype;
-
    /* DATES AND TIME */
 
    -- Return the # of seconds between two timestamps.
@@ -121,10 +118,18 @@ create or replace package arcsql as
    -- Deletes an event from the event table. This is a global action, not session.
    procedure delete_event (event_group varchar2, subgroup varchar2, name varchar2);
 
-   /* LOGGING */
-   -- -1 Nothing is logged.
-   -- 0 Non debug calls are logged.
-   -- 1 through 3 determines which debug calls make it through.
+   /* 
+   -----------------------------------------------------------------------------------
+   Logging
+
+   Log level is controlled using the log_level package variable.
+
+     -1: Nothing is logged.
+      0: Non debug calls are logged.
+    1-3: Debug calls level 1 through 3 are logged. 3 having the most detail.
+   -----------------------------------------------------------------------------------
+   */
+
    log_level number default 1;
    procedure log (log_text in varchar2, log_key in varchar2 default null, log_tags in varchar2 default null);
    procedure audit (audit_text in varchar2, audit_key in varchar2 default null, audit_tags in varchar2 default null);
@@ -134,7 +139,14 @@ create or replace package arcsql as
    procedure debug3 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null);
    procedure alert (alert_text in varchar2, alert_key in varchar2 default null, alert_tags in varchar2 default null);
    procedure fail (fail_text in varchar2, fail_key in varchar2 default null, fail_tags in varchar2 default null);
-   /* UNIT TESTING */
+   
+   /* 
+   -----------------------------------------------------------------------------------
+   Unit Testing
+
+   This is a light weight unit test framework to quickly build some simple tests.
+   -----------------------------------------------------------------------------------
+   */
 
    -- -1 initialized, 1 true, 0 false
    test_name varchar2(255) := null;
@@ -147,10 +159,26 @@ create or replace package arcsql as
    procedure init_test(test_name varchar2);
    procedure test;
 
+   /* 
+   -----------------------------------------------------------------------------------
+   Application Monitoring/Testing
+
+   This feature allows you to write tests that monitor your environments and apps.
+   -----------------------------------------------------------------------------------
+   */
+
+   -- Stores the current app test profile.
+   g_app_test_profile app_test_profile%rowtype;
+   -- Stores the current app test record.
+   g_app_test app_test%rowtype;
+
    procedure add_app_test_profile (
+      -- 
       p_profile_name in varchar2,
       p_env_type in varchar2 default null,
+      p_is_default in varchar2 default 'N',
       p_test_interval in number default 0,
+      p_recheck_interval in number default 0,
       p_retry_count in number default 0,
       p_retry_interval in number default 0,
       p_retry_keyword in varchar2 default 'warning',
@@ -166,18 +194,18 @@ create or replace package arcsql as
       );
 
    procedure set_app_test_profile (
-      p_profile_name in varchar2,
-      p_env_type in varchar2);
+      p_profile_name in varchar2 default null,
+      p_env_type in varchar2 default null);
 
    procedure save_app_test_profile;
    procedure save_app_test;
 
-   function does_test_profile_exist(
-   p_profile_name in varchar2,
-   p_env_type in varchar2) return boolean;
+   function does_app_test_profile_exist (
+      p_profile_name in varchar2 default null,
+      p_env_type in varchar2 default null) return boolean;
 
    function init_app_test (p_test_name varchar2) return boolean;
-   procedure app_test_fail(p_message in varchar2 default null);
-   procedure app_test_pass;
+      procedure app_test_fail(p_message in varchar2 default null);
+      procedure app_test_pass;
 
 end;
