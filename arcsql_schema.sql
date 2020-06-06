@@ -666,7 +666,6 @@ begin
       retry_count number default 0,
       -- Sum of all retry attempts.
       total_retries number default 0,
-      last_retry_time date default null,
       message varchar2(1000),
       -- ToDo: Add this.
       enabled varchar2(1) default ''Y''

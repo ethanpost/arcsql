@@ -178,6 +178,7 @@ create or replace package arcsql as
       p_env_type in varchar2 default null,
       p_is_default in varchar2 default 'N',
       p_test_interval in number default 0,
+      p_recheck_interval in number default 0,
       p_retry_count in number default 0,
       p_retry_interval in number default 0,
       p_retry_keyword in varchar2 default 'warning',
