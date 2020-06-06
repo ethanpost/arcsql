@@ -1502,16 +1502,16 @@ procedure add_app_test_profile (
    p_recheck_interval in number default 0,
    p_retry_count in number default 0,
    p_retry_interval in number default 0,
-   p_retry_keyword in varchar2 default 'warning',
+   p_retry_keyword in varchar2 default 'retry',
    p_failed_keyword in varchar2 default 'warning',
    p_reminder_interval in number default 60,
    p_reminder_keyword in varchar2 default 'warning',
    -- Changes reminder interval for each occurance by some number or %.
    p_reminder_interval_change in varchar2 default null,
    p_abandon_interval in varchar2 default null,
-   p_abandon_keyword in varchar2 default 'warning',
+   p_abandon_keyword in varchar2 default 'abandon',
    p_abandon_reset in varchar2 default 'N',
-   p_pass_keyword in varchar2 default 'passing'
+   p_pass_keyword in varchar2 default 'passed'
    ) is
 begin
    if not does_app_test_profile_exist(p_profile_name, p_env_type) then
@@ -1703,6 +1703,11 @@ begin
       null;
    end if;
    if g_app_test.test_status in ('RETRY') and retry_interval then 
+      if not g_app_test_profile.retry_keyword is null then
+         arcsql.log(
+            log_text=>'['||g_app_test_profile.retry_keyword||'] Application test '''||g_app_test.test_name||''' is being retried.',
+            log_key=>'app_test');
+      end if;
       time_to_test := true;
    end if;
    if g_app_test.test_status in ('FAIL', 'ABANDON') and (recheck_interval or test_interval) then 
@@ -1724,6 +1729,14 @@ begin
    end if;
 end;
 
+procedure reset_app_test_profile is 
+begin 
+   raise_app_test_profile_not_set;
+   set_app_test_profile(
+     p_profile_name=>g_app_test_profile.profile_name,
+     p_env_type=>g_app_test_profile.env_type);
+end;
+
 procedure app_test_check is 
    -- Sends reminders and changes status to ABANDON when test status is currently FAIL.
 
@@ -1743,9 +1756,11 @@ procedure app_test_check is
    begin 
       g_app_test.abandon_time := sysdate;
       g_app_test.total_abandons := g_app_test.total_abandons + 1;
-      arcsql.log(
-         log_text=>'['||g_app_test_profile.abandon_keyword||'] Application test '''||g_app_test.test_name||''' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
-         log_key=>'app_test');
+      if not g_app_test_profile.abandon_keyword is null then 
+         arcsql.log(
+            log_text=>'['||g_app_test_profile.abandon_keyword||'] Application test '''||g_app_test.test_name||''' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
+            log_key=>'app_test');
+      end if;
       -- If reset is Y the test changes back to PASS and will likely FAIL on the next check and cycle through the whole process again.
       if nvl(g_app_test_profile.abandon_reset, 'N') = 'N' then 
          g_app_test.test_status := 'ABANDON';
@@ -1787,9 +1802,11 @@ procedure app_test_check is
       g_app_test.last_reminder_time := sysdate;
       g_app_test.reminder_count := g_app_test.reminder_count + 1;
       g_app_test.total_reminders := g_app_test.total_reminders + 1;
-      arcsql.log(
-         log_text=>'['||g_app_test_profile.reminder_keyword||'] A reminder that application test '''||g_app_test.test_name||''' is still failing.',
-         log_key=>'app_test');
+      if not g_app_test_profile.reminder_keyword is null then
+         arcsql.log(
+            log_text=>'['||g_app_test_profile.reminder_keyword||'] A reminder that application test '''||g_app_test.test_name||''' is still failing.',
+            log_key=>'app_test');
+      end if;
    end;
 
 begin 
@@ -1823,13 +1840,27 @@ procedure app_test_fail (p_message in varchar2 default null) is
       g_app_test.failed_time := g_app_test.test_end_time;
       g_app_test.last_reminder_time := g_app_test.test_end_time;
       g_app_test.total_failures := g_app_test.total_failures + 1;
-      arcsql.log(
-         log_text=>'['||g_app_test_profile.failed_keyword||'] Application test '''||g_app_test.test_name||''' has failed.',
-         log_key=>'app_test');
+      if not g_app_test_profile.failed_keyword is null then 
+         arcsql.log(
+            log_text=>'['||g_app_test_profile.failed_keyword||'] Application test '''||g_app_test.test_name||''' has failed.',
+            log_key=>'app_test');
+      end if;
+   end;
+
+   function app_test_pass_fail_already_called return boolean is 
+   begin
+      if not g_app_test.test_end_time is null then
+         return true;
+      else
+         return false;
+      end if;
    end;
 
 begin 
    raise_app_test_not_set;
+   if app_test_pass_fail_already_called then 
+      return;
+   end if;
    arcsql.debug2('app_test_fail');
    g_app_test.test_end_time := sysdate;
    g_app_test.message := p_message;
@@ -1866,19 +1897,40 @@ procedure app_test_pass is
       g_app_test.reminder_count := 0;
       g_app_test.reminder_interval := g_app_test_profile.reminder_interval;
       g_app_test.retry_count := 0;
-      arcsql.log (
-         log_text=>'['||g_app_test_profile.pass_keyword||'] Application test '''||g_app_test.test_name||''' is now passing.',
-         log_key=>'app_test');
+      if not g_app_test_profile.pass_keyword is null then
+         arcsql.log (
+            log_text=>'['||g_app_test_profile.pass_keyword||'] Application test '''||g_app_test.test_name||''' is now passing.',
+            log_key=>'app_test');
+      end if;
+   end;
+
+   function app_test_pass_fail_already_called return boolean is 
+   begin
+      if not g_app_test.test_end_time is null then
+         return true;
+      else
+         return false;
+      end if;
    end;
 
 begin 
    raise_app_test_not_set;
+   if app_test_pass_fail_already_called then 
+      return;
+   end if;
    arcsql.debug2('app_test_pass');
    g_app_test.test_end_time := sysdate;
    if g_app_test.test_status not in ('PASS') or g_app_test.passed_time is null then 
       do_app_pass_test;
    end if;
    save_app_test;
+end;
+
+procedure app_test_done is 
+   -- Marks completion of test. Not required but auto passes any test if fail has not been called. 
+begin 
+   -- This only runs if app_test_fail has not already been called.
+   app_test_pass;
 end;
 
 procedure save_app_test is 
@@ -1889,3 +1941,4 @@ begin
 end;
 
 end;
+/

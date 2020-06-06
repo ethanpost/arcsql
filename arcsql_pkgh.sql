@@ -181,21 +181,22 @@ create or replace package arcsql as
       p_recheck_interval in number default 0,
       p_retry_count in number default 0,
       p_retry_interval in number default 0,
-      p_retry_keyword in varchar2 default 'warning',
+      p_retry_keyword in varchar2 default 'retry',
       p_failed_keyword in varchar2 default 'warning',
       p_reminder_interval in number default 60,
       p_reminder_keyword in varchar2 default 'warning',
       -- Changes reminder interval for each occurance by some number or %.
       p_reminder_interval_change in varchar2 default null,
       p_abandon_interval in varchar2 default null,
-      p_abandon_keyword in varchar2 default 'warning',
+      p_abandon_keyword in varchar2 default 'abandon',
       p_abandon_reset in varchar2 default 'N',
-      p_pass_keyword in varchar2 default 'passing'
+      p_pass_keyword in varchar2 default 'passed'
       );
 
    procedure set_app_test_profile (
       p_profile_name in varchar2 default null,
       p_env_type in varchar2 default null);
+   procedure reset_app_test_profile;
 
    procedure save_app_test_profile;
    procedure save_app_test;
@@ -205,7 +206,11 @@ create or replace package arcsql as
       p_env_type in varchar2 default null) return boolean;
 
    function init_app_test (p_test_name varchar2) return boolean;
-      procedure app_test_fail(p_message in varchar2 default null);
-      procedure app_test_pass;
+
+   procedure app_test_fail(p_message in varchar2 default null);
+   procedure app_test_pass;
+   procedure app_test_done;
 
 end;
+/
+

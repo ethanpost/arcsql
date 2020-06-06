@@ -209,20 +209,24 @@ begin
    --
    arcsql.init_test('App test expected to retry twice, then fail.');
    arcsql.g_app_test_profile.retry_count := 2;
-   
    if arcsql.init_app_test(p_test_name=>'bar') then 
       arcsql.g_app_test.test_status := 'PASS';
       arcsql.app_test_fail;
-      arcsql.app_test_fail;
-      if arcsql.g_app_test.test_status != 'RETRY' then 
-         arcsql.fail_test;
+      if arcsql.init_app_test(p_test_name=>'bar') then
+         arcsql.app_test_fail('Forcing second app test failure.');
       end if;
-      arcsql.app_test_fail;
+      if arcsql.g_app_test.test_status != 'RETRY' then 
+         arcsql.fail_test('Unit test failed because status was not RETRY.');
+      end if;
+      if arcsql.init_app_test(p_test_name=>'bar') then
+         arcsql.app_test_fail('Forcing third app test failure.');
+      end if;
       if arcsql.g_app_test.test_status != 'FAIL' then 
-         arcsql.fail_test;
+         arcsql.fail_test('Unit test failed because status was not FAIL.');
       end if;
    end if;
    arcsql.pass_test;
+   arcsql.reset_app_test_profile;
 
    --
    arcsql.init_test('App test expected to pass again.');
@@ -244,5 +248,9 @@ end;
 
 exec test_app_test_profiles;
 exec test_basic_app_profile_features;
+
+drop procedure test_app_test_profiles;
+drop procedure test_basic_app_profile_features;
+
 
 
