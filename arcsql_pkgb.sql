@@ -1,5 +1,11 @@
 create or replace package body arcsql as
 
+/* 
+-----------------------------------------------------------------------------------
+Datetime
+-----------------------------------------------------------------------------------
+*/
+
 function secs_between_timestamps (time_start in timestamp, time_end in timestamp) return number is
    total_secs number;
    d interval day(9) to second(6);
@@ -19,6 +25,12 @@ begin
    total_secs := abs(extract(second from d) + extract(minute from d)*60 + extract(hour from d)*60*60 + extract(day from d)*24*60*60);
    return total_secs;
 end;
+
+/* 
+-----------------------------------------------------------------------------------
+Strings
+-----------------------------------------------------------------------------------
+*/
 
 function str_to_key_str (str in varchar2) return varchar2 is
    new_str varchar2(1000);
@@ -165,6 +177,12 @@ begin
    return true;
 end;
 
+/* 
+-----------------------------------------------------------------------------------
+Numbers
+-----------------------------------------------------------------------------------
+*/
+
 function num_get_variance_pct (
       p_val number,
       p_pct_chance number,
@@ -196,6 +214,12 @@ begin
    p_new_val := p_val + round(dbms_random.value(p_change_low, p_change_high), p_decimals);
    return round(p_new_val, p_decimals);
 end;
+
+/* 
+-----------------------------------------------------------------------------------
+Utilities
+-----------------------------------------------------------------------------------
+*/
 
 procedure backup_table (sourceTable varchar2, newTable varchar2, dropTable boolean := false) is
 begin
@@ -381,10 +405,9 @@ begin
 end;
 
 /* 
-SIMPLE KEY VALUE STORE 
-
-ToDo: 
-- Change input vars so they are consistent.
+-----------------------------------------------------------------------------------
+Key/Value Database
+-----------------------------------------------------------------------------------
 */
 
 procedure cache (
@@ -438,7 +461,11 @@ begin
     where key=lower(cache_key);
 end;
 
-/* CUSTOM SETTINGS */
+/* 
+-----------------------------------------------------------------------------------
+Configuration
+-----------------------------------------------------------------------------------
+*/
 
 procedure remove_config (name varchar2) is
 begin
@@ -474,7 +501,11 @@ exception
       return null;
 end;
 
-/* SQL LOG */
+/* 
+-----------------------------------------------------------------------------------
+SQL Monitoring
+-----------------------------------------------------------------------------------
+*/
 
 function get_sql_log_analyze_min_secs return number is
 begin  
@@ -1129,12 +1160,20 @@ begin
 
 end;
 
+/* 
+-----------------------------------------------------------------------------------
+Counters
+-----------------------------------------------------------------------------------
+*/
 
-function does_counter_exist (counter_group varchar2, subgroup varchar2, name varchar2) return boolean is 
+function does_counter_exist (
+   counter_group varchar2, 
+   subgroup varchar2, 
+   name varchar2) return boolean is 
    n number;
 begin
    select count(*) into n 
-     from counter 
+     from arcsql_counter 
     where counter_group=does_counter_exist.counter_group 
       and nvl(subgroup, '~')=nvl(does_counter_exist.subgroup, '~')
       and name=does_counter_exist.name;
@@ -1145,10 +1184,16 @@ begin
    end if;
 end;
 
-procedure set_counter (counter_group varchar2, subgroup varchar2, name varchar2, equal number default null, add number default null, subtract number default null) is
+procedure set_counter (
+  counter_group varchar2, 
+  subgroup varchar2, 
+  name varchar2, 
+  equal number default null, 
+  add number default null, 
+  subtract number default null) is
 begin
    if not does_counter_exist(counter_group=>set_counter.counter_group, subgroup=>set_counter.subgroup, name=>set_counter.name) then 
-      insert into counter (
+      insert into arcsql_counter (
       id,
       counter_group,
       subgroup,
@@ -1162,7 +1207,7 @@ begin
       nvl(set_counter.equal, 0),
       sysdate);
    end if;
-   update counter 
+   update arcsql_counter 
       set value=nvl(set_counter.equal, value)+nvl(set_counter.add, 0)-nvl(set_counter.subtract, 0),
           update_time = sysdate
     where counter_group=set_counter.counter_group 
@@ -1170,10 +1215,13 @@ begin
       and name=set_counter.name;
 end;
 
-procedure delete_counter (counter_group varchar2, subgroup varchar2, name varchar2) is
+procedure delete_counter (
+  counter_group varchar2, 
+  subgroup varchar2, 
+  name varchar2) is
 begin 
    if does_counter_exist(counter_group=>delete_counter.counter_group, subgroup=>delete_counter.subgroup, name=>delete_counter.name) then 
-      delete from counter 
+      delete from arcsql_counter 
        where counter_group=delete_counter.counter_group 
          and nvl(subgroup, '~')=nvl(delete_counter.subgroup, '~')
          and name=delete_counter.name;

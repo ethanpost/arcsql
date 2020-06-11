@@ -447,13 +447,14 @@ create or replace view sql_snap_view as (
 
 -- uninstall: drop sequence seq_counter_id;
 -- uninstall: drop table counter;
+drop table counter;
 begin
    if not does_sequence_exist('seq_counter_id') then 
       execute_sql('create sequence seq_counter_id');
    end if;
-   if not does_table_exist('counter') then
+   if not does_table_exist('arcsql_counter') then
        execute_sql('
-       create table counter (
+       create table arcsql_counter (
        id number not null,
        counter_group varchar2(100) not null,
        subgroup varchar2(100) default null,
@@ -462,7 +463,7 @@ begin
        update_time date default sysdate
        )', false);
     
-      execute_sql('create index counter_1 on counter (name)', true);
+      execute_sql('create index arcsql_counter_1 on arcsql_counter (name)', true);
     
     end if;
 end;
