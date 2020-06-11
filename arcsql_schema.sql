@@ -471,14 +471,14 @@ end;
 /* EVENTS */
 
 -- uninstall: drop sequence seq_event_id;
--- uninstall: drop table event;
+-- uninstall: drop table arcsql_event;
 begin
    if not does_sequence_exist('seq_event_id') then 
       execute_sql('create sequence seq_event_id');
    end if;
-   if not does_table_exist('event') then
+   if not does_table_exist('arcsql_event') then
        execute_sql('
-       create table event (
+       create table arcsql_event (
        id number not null,
        event_group varchar2(100) not null,
        subgroup varchar2(100) default null,
@@ -489,7 +489,7 @@ begin
        last_end_time date
        )', false);
     
-      execute_sql('create index event_1 on event (name)', true);
+      execute_sql('create index arcsql_event_1 on arcsql_event (name)', true);
     
     end if;
 end;
@@ -521,10 +521,11 @@ begin
 end;
 /
 
+-- uninstall: drop table arcsql_event_log;
 begin
-   if not does_table_exist('event_log') then
+   if not does_table_exist('arcsql_event_log') then
        execute_sql('
-       create table event_log (
+       create table arcsql_event_log (
        id number not null,
        event_group varchar2(100) not null,
        subgroup varchar2(100) default null,
@@ -534,9 +535,7 @@ begin
        last_start_time date,
        last_end_time date
        )', false);
-    
-      execute_sql('create index event_1 on event (name)', true);
-    
+      execute_sql('create index arcsql_event_log_1 on arcsql_event_log (name)', true);
     end if;
 end;
 /
@@ -644,7 +643,7 @@ end;
 /
 
 -- uninstall: drop table app_test cascade constraints purge;
-drop table app_test;
+drop table app_test cascade constraints purge;
 begin
    if not does_table_exist('app_test') then 
       execute_sql('
@@ -674,3 +673,4 @@ begin
    end if;
 end;
 /
+

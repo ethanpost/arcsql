@@ -13,3 +13,18 @@ exec arcsql.add_config('purge_event_hours', '4', 'ArcSQL purges data from sessio
 
 exec arcsql.set_config('arcsql_version', '0.11');
 
+begin
+  if not does_scheduler_job_exist('arcsql_run_sql_log_update') then 
+     dbms_scheduler.create_job (
+       job_name        => 'arcsql_run_sql_log_update',
+       job_type        => 'PLSQL_BLOCK',
+       job_action      => 'begin arcsql.run_sql_log_update; end;',
+       start_date      => systimestamp,
+       repeat_interval => 'freq=minutely;interval=5',
+       enabled         => true);
+   end if;
+end;
+/
+
+
+

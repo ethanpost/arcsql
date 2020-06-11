@@ -167,41 +167,16 @@ begin
 end;
 /
 
--- uninstall: drop function does_matching_job_exist;
-create or replace function does_matching_job_exist (job_name varchar2) return boolean is
+create or replace function does_scheduler_job_exist (p_job_name in varchar2) return boolean is
    n number;
-begin
-   select count(*) into n from user_jobs 
-    where lower(what) like lower('%'||does_matching_job_exist.job_name||'%');
-   if n = 0 then
+begin 
+   select count(*) into n from all_scheduler_jobs
+    where job_name=upper(p_job_name);
+   if n = 0 then 
       return false;
-   else
+   else 
       return true;
    end if;
-exception
-when others then
-   raise;
-end;
-/
-
--- uninstall: drop procedure remove_matching_jobs;
-create or replace procedure remove_matching_jobs (job_name in varchar2) is
-   type type_cur is ref cursor;
-   t type_cur;
-   j number;
-   w varchar2(4000);
-begin
-   open t for '
-   select job, what from user_jobs
-    where upper(what) like ''%'||upper(remove_matching_jobs.job_name)||'%''';
-   loop
-      fetch t into j, w;
-         exit when t%notfound;
-         dbms_job.remove(j);
-   end loop;
-exception
-   when others then
-      raise;
 end;
 /
 

@@ -1,13 +1,21 @@
 create or replace package arcsql as
 
-   /* DATES AND TIME */
+   /* 
+   -----------------------------------------------------------------------------------
+   Datetime
+   -----------------------------------------------------------------------------------
+   */
 
    -- Return the # of seconds between two timestamps.
    function secs_between_timestamps (time_start in timestamp, time_end in timestamp) return number;
    -- return the # of seconds since a timestamp.
    function secs_since_timestamp(time_stamp timestamp) return number;
 
-   /* STRINGS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Strings
+   -----------------------------------------------------------------------------------
+   */
 
    -- Return Y if string converts to a date, else N. Assumes 'MM/DD/YYYY' format.
    function str_is_date_y_or_n (text varchar2) return varchar2;
@@ -32,7 +40,11 @@ create or replace package arcsql as
     digit      integer := null,
     special    integer := null) return boolean;
 
-   /* NUMBERS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Numbers
+   -----------------------------------------------------------------------------------
+   */
 
    function num_get_variance_pct (
       p_val number,
@@ -48,7 +60,11 @@ create or replace package arcsql as
       p_change_high number,
       p_decimals number default 0) return number;
 
-   /* UTILITIES */
+   /* 
+   -----------------------------------------------------------------------------------
+   Utilities
+   -----------------------------------------------------------------------------------
+   */
 
    -- Create a copy of a table and possibly drop the existing copy if it already exists.
    procedure backup_table (sourceTable varchar2, newTable varchar2, dropTable boolean := false);
@@ -61,7 +77,12 @@ create or replace package arcsql as
 
    function get_days_since_pass_change (username varchar2) return number;
 
-   /* APPLICATION VERSIONING */
+   /* 
+   -----------------------------------------------------------------------------------
+   Application Versioning
+   -----------------------------------------------------------------------------------
+   */
+
    procedure set_app_version(
       p_app_name in varchar2, 
       p_version in number,
@@ -70,14 +91,22 @@ create or replace package arcsql as
    function get_app_version(p_app_name in varchar2) return number;
    procedure delete_app_version(p_app_name in varchar2);
 
-   /* SIMPLE VALUE KEY STORE */
+   /* 
+   -----------------------------------------------------------------------------------
+   Key/Value Database
+   -----------------------------------------------------------------------------------
+   */
 
    procedure cache (cache_key varchar2, p_value varchar2);
    function return_cached_value (cache_key varchar2) return varchar2;
    function does_cache_key_exist (cache_key varchar2) return boolean;
    procedure delete_cache_key (cache_key varchar2);
 
-   /* CUSTOM CONFIG */
+   /* 
+   -----------------------------------------------------------------------------------
+   Configuration
+   -----------------------------------------------------------------------------------
+   */
 
    -- Add a config setting. Forced to lcase. If already exists nothing happens.
    procedure add_config (name varchar2, value varchar2, description varchar2 default null);
@@ -88,20 +117,28 @@ create or replace package arcsql as
    -- Return the config value. Returns null if it does not exist.
    function  get_config (name varchar2)  return varchar2;
 
-   /* SQL LOG (Monitoring) */
+   /* 
+   -----------------------------------------------------------------------------------
+   SQL Monitoring
+   -----------------------------------------------------------------------------------
+   */
 
    procedure run_sql_log_update;
 
-   /* BUILT IN JOB WINDOWS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Start and stop ArcSQL delivered tasks.
+   -----------------------------------------------------------------------------------
+   */
 
-   -- Creates the DBMS_JOBS required to run the scheduled tasks below.
-   procedure run;
-   procedure stop;
-   -- Removes the DBMS_JOBS associated with the scheduled tasks below.
-   procedure run_every_1_minutes;
-   procedure run_every_5_minutes;
+   procedure start_arcsql;
+   procedure stop_arcsql;
 
-   /* COUNTERS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Counters
+   -----------------------------------------------------------------------------------
+   */
 
    function does_counter_exist (counter_group varchar2, subgroup varchar2, name varchar2) return boolean;
    -- Sets a counter to a value. Is created if it doesn't exist.
@@ -109,7 +146,11 @@ create or replace package arcsql as
     -- Deletes a counter. Nothing happens if it doesn't exist.
    procedure delete_counter (counter_group varchar2, subgroup varchar2, name varchar2);
 
-   /* EVENTS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Events
+   -----------------------------------------------------------------------------------
+   */
 
    -- Starts an event. It is linked to the current session.
    procedure start_event (event_group varchar2, subgroup varchar2, name varchar2);
@@ -117,16 +158,11 @@ create or replace package arcsql as
    procedure stop_event (event_group varchar2, subgroup varchar2, name varchar2);
    -- Deletes an event from the event table. This is a global action, not session.
    procedure delete_event (event_group varchar2, subgroup varchar2, name varchar2);
+   procedure purge_events;
 
    /* 
    -----------------------------------------------------------------------------------
    Logging
-
-   Log level is controlled using the log_level package variable.
-
-     -1: Nothing is logged.
-      0: Non debug calls are logged.
-    1-3: Debug calls level 1 through 3 are logged. 3 having the most detail.
    -----------------------------------------------------------------------------------
    */
 
@@ -143,8 +179,6 @@ create or replace package arcsql as
    /* 
    -----------------------------------------------------------------------------------
    Unit Testing
-
-   This is a light weight unit test framework to quickly build some simple tests.
    -----------------------------------------------------------------------------------
    */
 
@@ -162,8 +196,6 @@ create or replace package arcsql as
    /* 
    -----------------------------------------------------------------------------------
    Application Monitoring/Testing
-
-   This feature allows you to write tests that monitor your environments and apps.
    -----------------------------------------------------------------------------------
    */
 

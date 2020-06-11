@@ -1180,7 +1180,13 @@ begin
    end if;
 end;
 
-/* EVENTS */
+/* 
+ -----------------------------------------------------------------------------------
+ Events
+
+ Records event durations in 
+ -----------------------------------------------------------------------------------
+ */
 
 procedure purge_events is 
 /*
@@ -1271,7 +1277,7 @@ begin
       and nvl(subgroup, '~')=nvl(stop_event.subgroup, '~')
       and name=stop_event.name;
 
-   update event set 
+   update arcsql_event set 
       event_count=event_count+1,
       total_secs=total_secs+v_elapsed_seconds,
       last_start_time=v_start_time,
@@ -1281,7 +1287,7 @@ begin
       and name=stop_event.name;
 
    if sql%rowcount = 0 then 
-      insert into event (
+      insert into arcsql_event (
          id,
          event_group,
          subgroup,
@@ -1318,7 +1324,7 @@ Delete all references to an event.
    pragma autonomous_transaction;
    v_audsid number := get_audsid;
 begin 
-   delete from event 
+   delete from arcsql_event 
     where event_group=delete_event.event_group
       and nvl(subgroup, '~')=nvl(delete_event.subgroup, '~')
       and name=delete_event.name;
@@ -1329,40 +1335,39 @@ exception
       raise;
 end;
 
-/* BUILT IN JOB WINDOWS */
+/* 
+-----------------------------------------------------------------------------------
+Task Scheduling
+-----------------------------------------------------------------------------------
+*/
 
-procedure run is 
-   n number;
+procedure start_arcsql is 
+   cursor tasks is 
+   select * from all_scheduler_jobs 
+    where job_name like 'ARCSQL%';
 begin 
-   if not does_matching_job_exist('arcsql.run_every_1_minutes') then
-      dbms_job.submit(n, 'arcsql.run_every_1_minutes;', sysdate+(1/1440), 'sysdate+(1/1440)');
-   end if;
-   if not does_matching_job_exist('arcsql.run_every_5_minutes') then
-      dbms_job.submit(n, 'arcsql.run_every_5_minutes;', sysdate+(5/1440), 'sysdate+(5/1440)');
-   end if;
+   for task in tasks loop 
+      dbms_scheduler.enable(task.job_name);
+   end loop;
    commit;
 end;
 
-procedure stop is 
+procedure stop_arcsql is 
+   cursor tasks is 
+   select * from all_scheduler_jobs 
+    where job_name like 'ARCSQL%';
 begin 
-   remove_matching_jobs('arcsql.run_every_');
+   for task in tasks loop 
+      dbms_scheduler.disable(task.job_name);
+   end loop;
    commit;
 end;
 
-procedure run_every_1_minutes is 
-begin 
-   set_counter(counter_group=>'arcsql', subgroup=>'task_scheduler', name=>'run_every_1_minutes', add=>1);
-   commit;
-end;
-
-procedure run_every_5_minutes is 
-begin 
-   run_sql_log_update;
-   purge_events;
-   commit;
-end;
-
-/* LOGGING */
+/* 
+-----------------------------------------------------------------------------------
+Logging
+-----------------------------------------------------------------------------------
+*/
 
 procedure log_interface (
    log_text in varchar2, 

@@ -21,6 +21,10 @@ begin
       select count(*) into n 
         from user_types
        where type_name=upper(does_object_exist.object_name);
+   elsif upper(does_object_exist.object_type) = 'CONSTRAINT' then
+      select count(*) into n 
+        from user_constraints
+       where constraint_name=upper(does_object_exist.object_name);
    else
       select count(*) into n 
         from user_objects 
@@ -81,6 +85,32 @@ when others then
 end;
 /
 
+-- uninstall: drop function does_constraint_exist;
+create or replace function does_constraint_exist (constraint_name varchar2) return boolean is
+begin
+   if does_object_exist(does_constraint_exist.constraint_name, 'CONSTRAINT') then
+      return true;
+   else
+      return false;
+   end if;
+exception
+when others then
+   raise;
+end;
+/
+
+-- uninstall: drop procedure drop_index;
+create or replace procedure drop_index(index_name varchar2) is 
+begin
+  if does_object_exist(drop_index.index_name, 'INDEX') then
+    drop_object(drop_index.index_name, 'INDEX');
+  end if;
+exception
+  when others then
+     raise;
+end;
+/
+
 -- uninstall: drop procedure drop_object;
 create or replace procedure drop_object (object_name varchar2, object_type varchar2) is
    n number;
@@ -129,44 +159,28 @@ begin
 end;
 /
 
--- uninstall: drop function does_matching_job_exist;
-create or replace function does_matching_job_exist (job_name varchar2) return boolean is
-   n number;
+create or replace procedure create_sequence (sequence_name in varchar2) is 
 begin
-   select count(*) into n from user_jobs 
-    where lower(what) like lower('%'||does_matching_job_exist.job_name||'%');
-   if n = 0 then
+   if not does_sequence_exist(sequence_name) then
+      execute_sql('create sequence '||sequence_name, false);
+   end if;
+end;
+/
+
+create or replace function does_scheduler_job_exist (p_job_name in varchar2) return boolean is
+   n number;
+begin 
+   select count(*) into n from all_scheduler_jobs
+    where job_name=upper(p_job_name);
+   if n = 0 then 
       return false;
-   else
+   else 
       return true;
    end if;
-exception
-when others then
-   raise;
 end;
 /
 
--- uninstall: drop procedure remove_matching_jobs;
-create or replace procedure remove_matching_jobs (job_name in varchar2) is
-   type type_cur is ref cursor;
-   t type_cur;
-   j number;
-   w varchar2(4000);
-begin
-   open t for '
-   select job, what from user_jobs
-    where upper(what) like ''%'||upper(remove_matching_jobs.job_name)||'%''';
-   loop
-      fetch t into j, w;
-         exit when t%notfound;
-         dbms_job.remove(j);
-   end loop;
-exception
-   when others then
-      raise;
-end;
-/
-
+-- Needs to be a standalong func here and not in arcsql package becuase authid current user is used.
 create or replace function num_get_val_from_sql(sql_text in varchar2) return number authid current_user is 
    n number;
 begin
@@ -661,14 +675,14 @@ end;
 /* EVENTS */
 
 -- uninstall: drop sequence seq_event_id;
--- uninstall: drop table event;
+-- uninstall: drop table arcsql_event;
 begin
    if not does_sequence_exist('seq_event_id') then 
       execute_sql('create sequence seq_event_id');
    end if;
-   if not does_table_exist('event') then
+   if not does_table_exist('arcsql_event') then
        execute_sql('
-       create table event (
+       create table arcsql_event (
        id number not null,
        event_group varchar2(100) not null,
        subgroup varchar2(100) default null,
@@ -679,7 +693,7 @@ begin
        last_end_time date
        )', false);
     
-      execute_sql('create index event_1 on event (name)', true);
+      execute_sql('create index arcsql_event_1 on arcsql_event (name)', true);
     
     end if;
 end;
@@ -711,10 +725,11 @@ begin
 end;
 /
 
+-- uninstall: drop table arcsql_event_log;
 begin
-   if not does_table_exist('event_log') then
+   if not does_table_exist('arcsql_event_log') then
        execute_sql('
-       create table event_log (
+       create table arcsql_event_log (
        id number not null,
        event_group varchar2(100) not null,
        subgroup varchar2(100) default null,
@@ -724,9 +739,7 @@ begin
        last_start_time date,
        last_end_time date
        )', false);
-    
-      execute_sql('create index event_1 on event (name)', true);
-    
+      execute_sql('create index arcsql_event_log_1 on arcsql_event_log (name)', true);
     end if;
 end;
 /
@@ -792,17 +805,98 @@ create or replace view database_users as (
 select username, account_status, lock_date, created, password_change_date 
   from dba_users);
 
+-- uninstall: drop table test_profile cascade constraints purge;
+drop table app_test_profile;
+begin
+   if not does_table_exist('app_test_profile') then 
+      execute_sql('
+      create table app_test_profile (
+      profile_name varchar2(120),
+      -- Environment type, can be something like prod, dev, test...
+      env_type varchar2(120) default null,
+      is_default varchar2(1) default ''N'',
+      test_interval number default 0,
+      -- If test is in FAIL or ABANDON we can recheck for PASS more frequently or less using 
+      -- the recheck_interval which has precedence over test_interval.
+      recheck_interval number default null,
+      -- The number of times to retry before failing.
+      retry_count number default 0 not null,
+      -- The interval to wait before allowing a retry, if null then test_interval is used.
+      retry_interval number default 0 not null,
+      -- Keyword to log when a retry is attempted.
+      retry_keyword varchar2(120) default null,
+      -- Keyword to log when state changes to failed.
+      failed_keyword varchar2(120),
+      -- Interval to wait between reminders. If null reminders are not sent.
+      reminder_interval number default null,
+      -- Keyword to log when a reminder is sent.
+      reminder_keyword varchar2(120),
+      -- Dynamically change the interval each time the reminder runs by some # or %.
+      reminder_backoff number default 1 not null,
+      -- Interval to wait before test is abandoned (test is still run but no reporting takes place if it continues to fail.)
+      abandon_interval number default null,
+      -- Keyword to log when abandon occurs.
+      abandon_keyword varchar2(120) default null,
+      -- If Y test resets automatically to passing on abandon.
+      abandon_reset varchar2(1) default ''N'',
+      -- Keyword to log when test changes from fail to pass.
+      pass_keyword varchar2(120))', false);
+      execute_sql('create index test_profile_1 on app_test_profile (profile_name, env_type)', false);
+    end if;
+end;
+/
+
+-- uninstall: drop table app_test cascade constraints purge;
+drop table app_test cascade constraints purge;
+begin
+   if not does_table_exist('app_test') then 
+      execute_sql('
+      create table app_test (
+      test_name varchar2(120) not null,
+      test_status varchar2(120) default ''PASS'',
+      passed_time date default null,
+      failed_time date default null,
+      test_start_time date default null,
+      test_end_time date default null,
+      total_test_count number default 0,
+      total_failures number default 0,
+      last_reminder_time date default null,
+      reminder_interval number default null,
+      reminder_count number default 0,
+      total_reminders number default 0,
+      abandon_time date default null,
+      total_abandons number default 0,
+      retry_count number default 0,
+      -- Sum of all retry attempts.
+      total_retries number default 0,
+      message varchar2(1000),
+      -- ToDo: Add this.
+      enabled varchar2(1) default ''Y''
+      )', false);
+      execute_sql('alter table app_test add constraint pk_app_test primary key (test_name)', false);
+   end if;
+end;
+/
+
 
 create or replace package arcsql as
 
-   /* DATES AND TIME */
+   /* 
+   -----------------------------------------------------------------------------------
+   Datetime
+   -----------------------------------------------------------------------------------
+   */
 
    -- Return the # of seconds between two timestamps.
    function secs_between_timestamps (time_start in timestamp, time_end in timestamp) return number;
    -- return the # of seconds since a timestamp.
    function secs_since_timestamp(time_stamp timestamp) return number;
 
-   /* STRINGS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Strings
+   -----------------------------------------------------------------------------------
+   */
 
    -- Return Y if string converts to a date, else N. Assumes 'MM/DD/YYYY' format.
    function str_is_date_y_or_n (text varchar2) return varchar2;
@@ -816,7 +910,7 @@ create or replace package arcsql as
    function str_hash_md5 (text varchar2) return varchar2;
    -- Return true if string appears to be an email address.
    function str_is_email (text varchar2) return boolean;
-   
+
    -- Borrowed and adapted from the ora_complexity_check function.
    function str_complexity_check
    (text   varchar2,
@@ -827,7 +921,11 @@ create or replace package arcsql as
     digit      integer := null,
     special    integer := null) return boolean;
 
-   /* NUMBERS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Numbers
+   -----------------------------------------------------------------------------------
+   */
 
    function num_get_variance_pct (
       p_val number,
@@ -843,7 +941,11 @@ create or replace package arcsql as
       p_change_high number,
       p_decimals number default 0) return number;
 
-   /* UTILITIES */
+   /* 
+   -----------------------------------------------------------------------------------
+   Utilities
+   -----------------------------------------------------------------------------------
+   */
 
    -- Create a copy of a table and possibly drop the existing copy if it already exists.
    procedure backup_table (sourceTable varchar2, newTable varchar2, dropTable boolean := false);
@@ -856,22 +958,36 @@ create or replace package arcsql as
 
    function get_days_since_pass_change (username varchar2) return number;
 
-   /* APPLICATION VERSIONING */
+   /* 
+   -----------------------------------------------------------------------------------
+   Application Versioning
+   -----------------------------------------------------------------------------------
+   */
+
    procedure set_app_version(
       p_app_name in varchar2, 
       p_version in number,
       p_confirm in boolean := false);
    procedure confirm_app_version(p_app_name in varchar2);
    function get_app_version(p_app_name in varchar2) return number;
-   
-   /* SIMPLE VALUE KEY STORE */
+   procedure delete_app_version(p_app_name in varchar2);
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Key/Value Database
+   -----------------------------------------------------------------------------------
+   */
 
    procedure cache (cache_key varchar2, p_value varchar2);
    function return_cached_value (cache_key varchar2) return varchar2;
    function does_cache_key_exist (cache_key varchar2) return boolean;
    procedure delete_cache_key (cache_key varchar2);
-   
-   /* CUSTOM CONFIG */
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Configuration
+   -----------------------------------------------------------------------------------
+   */
 
    -- Add a config setting. Forced to lcase. If already exists nothing happens.
    procedure add_config (name varchar2, value varchar2, description varchar2 default null);
@@ -882,20 +998,28 @@ create or replace package arcsql as
    -- Return the config value. Returns null if it does not exist.
    function  get_config (name varchar2)  return varchar2;
 
-   /* SQL LOG (Monitoring) */
+   /* 
+   -----------------------------------------------------------------------------------
+   SQL Monitoring
+   -----------------------------------------------------------------------------------
+   */
 
    procedure run_sql_log_update;
 
-   /* BUILT IN JOB WINDOWS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Start and stop ArcSQL delivered tasks.
+   -----------------------------------------------------------------------------------
+   */
 
-   -- Creates the DBMS_JOBS required to run the scheduled tasks below.
-   procedure run;
-   procedure stop;
-   -- Removes the DBMS_JOBS associated with the scheduled tasks below.
-   procedure run_every_1_minutes;
-   procedure run_every_5_minutes;
+   procedure start_arcsql;
+   procedure stop_arcsql;
 
-   /* COUNTERS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Counters
+   -----------------------------------------------------------------------------------
+   */
 
    function does_counter_exist (counter_group varchar2, subgroup varchar2, name varchar2) return boolean;
    -- Sets a counter to a value. Is created if it doesn't exist.
@@ -903,7 +1027,11 @@ create or replace package arcsql as
     -- Deletes a counter. Nothing happens if it doesn't exist.
    procedure delete_counter (counter_group varchar2, subgroup varchar2, name varchar2);
 
-   /* EVENTS */
+   /* 
+   -----------------------------------------------------------------------------------
+   Events
+   -----------------------------------------------------------------------------------
+   */
 
    -- Starts an event. It is linked to the current session.
    procedure start_event (event_group varchar2, subgroup varchar2, name varchar2);
@@ -911,11 +1039,14 @@ create or replace package arcsql as
    procedure stop_event (event_group varchar2, subgroup varchar2, name varchar2);
    -- Deletes an event from the event table. This is a global action, not session.
    procedure delete_event (event_group varchar2, subgroup varchar2, name varchar2);
+   procedure purge_events;
 
-   /* LOGGING */
-   -- -1 Nothing is logged.
-   -- 0 Non debug calls are logged.
-   -- 1 through 3 determines which debug calls make it through.
+   /* 
+   -----------------------------------------------------------------------------------
+   Logging
+   -----------------------------------------------------------------------------------
+   */
+
    log_level number default 1;
    procedure log (log_text in varchar2, log_key in varchar2 default null, log_tags in varchar2 default null);
    procedure audit (audit_text in varchar2, audit_key in varchar2 default null, audit_tags in varchar2 default null);
@@ -925,7 +1056,12 @@ create or replace package arcsql as
    procedure debug3 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null);
    procedure alert (alert_text in varchar2, alert_key in varchar2 default null, alert_tags in varchar2 default null);
    procedure fail (fail_text in varchar2, fail_key in varchar2 default null, fail_tags in varchar2 default null);
-   /* UNIT TESTING */
+   
+   /* 
+   -----------------------------------------------------------------------------------
+   Unit Testing
+   -----------------------------------------------------------------------------------
+   */
 
    -- -1 initialized, 1 true, 0 false
    test_name varchar2(255) := null;
@@ -934,14 +1070,63 @@ create or replace package arcsql as
    assert_true boolean := true;
    assert_false boolean := false;
    procedure pass_test;
-   procedure fail_test;
+   procedure fail_test(fail_message in varchar2 default null);
    procedure init_test(test_name varchar2);
    procedure test;
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Application Monitoring/Testing
+   -----------------------------------------------------------------------------------
+   */
+
+   -- Stores the current app test profile.
+   g_app_test_profile app_test_profile%rowtype;
+   -- Stores the current app test record.
+   g_app_test app_test%rowtype;
+
+   procedure add_app_test_profile (
+      -- 
+      p_profile_name in varchar2,
+      p_env_type in varchar2 default null,
+      p_is_default in varchar2 default 'N',
+      p_test_interval in number default 0,
+      p_recheck_interval in number default 0,
+      p_retry_count in number default 0,
+      p_retry_interval in number default 0,
+      p_retry_keyword in varchar2 default 'retry',
+      p_failed_keyword in varchar2 default 'warning',
+      p_reminder_interval in number default 60,
+      p_reminder_keyword in varchar2 default 'warning',
+      p_reminder_backoff in number default 1,
+      p_abandon_interval in varchar2 default null,
+      p_abandon_keyword in varchar2 default 'abandon',
+      p_abandon_reset in varchar2 default 'N',
+      p_pass_keyword in varchar2 default 'passed'
+      );
+
+   procedure set_app_test_profile (
+      p_profile_name in varchar2 default null,
+      p_env_type in varchar2 default null);
+   procedure reset_app_test_profile;
+
+   procedure save_app_test_profile;
+   procedure save_app_test;
+
+   function does_app_test_profile_exist (
+      p_profile_name in varchar2 default null,
+      p_env_type in varchar2 default null) return boolean;
+
+   function init_app_test (p_test_name varchar2) return boolean;
+
+   procedure app_test_fail(p_message in varchar2 default null);
+   procedure app_test_pass;
+   procedure app_test_done;
 
 end;
 /
 
-show errors
+
 create or replace package body arcsql as
 
 function secs_between_timestamps (time_start in timestamp, time_end in timestamp) return number is
@@ -1000,10 +1185,10 @@ end;
 function str_is_email (text varchar2) return boolean is 
 begin 
   if regexp_like (text, '^[A-Za-z]+[A-Za-z0-9.]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}$') then 
-      arcsql.debug('str_is_email: yes: '||text);
+      arcsql.debug2('str_is_email: yes: '||text);
       return true;
   else 
-      arcsql.debug('str_is_email: no: '||text);
+      arcsql.debug2('str_is_email: no: '||text);
       return false;
    end if;
 end;
@@ -1117,7 +1302,7 @@ function num_get_variance_pct (
       p_decimals number default 0) return number is 
    p_new_val number;
 begin
-   arcsql.debug('num_get_variance_pct: '||p_val||','||p_pct_chance||','||p_change_low_pct||','||p_change_high_pct||','||p_decimals);
+   arcsql.debug2('num_get_variance_pct: '||p_val||','||p_pct_chance||','||p_change_low_pct||','||p_change_high_pct||','||p_decimals);
    if dbms_random.value(1,100) > p_pct_chance then 
       return p_val;
    end if;
@@ -1133,7 +1318,7 @@ function num_get_variance (
       p_decimals number default 0) return number is 
    p_new_val number;
 begin
-   arcsql.debug('num_get_variance: '||p_val||','||p_pct_chance||','||p_change_low||','||p_change_high||','||p_decimals);
+   arcsql.debug2('num_get_variance: '||p_val||','||p_pct_chance||','||p_change_low||','||p_change_high||','||p_decimals);
    if dbms_random.value(1,100) > p_pct_chance then 
       return p_val;
    end if;
@@ -1210,16 +1395,25 @@ begin
    return n;
 end;
 
-/* APPLICATION VERSIONING */
-
 /* 
+
+APPLICATION VERSIONING 
+
+Write and read the version you are on, going to, coming from. 
+
+Helpful for maintaining conditional idempotent upgrade paths.
 
 STATUS can be 'SET' or 'CONFIRMED'. SET indicates we are in the middle of a patch or 
 upgrade and CONFIRMED indicates successful. get_app_version always returns the 
 last confirmed version, not the version you are attempting to upgrade/patch to.
 
 confirm_app_version must be preceded by set_app_version. You can also call 
-set_app_version with p_confirmed=True which immediatly sets the status to CONFIRMED.
+set_app_version with p_confirmed=True which immediately sets the status to CONFIRMED.
+
+ToDo: 
+
+- Add logging for failure and success using the logging interface.
+- (Unlikely) - Track errors using system wide trigger interface (not built) and report.
 
 */
 
@@ -1227,7 +1421,7 @@ procedure set_app_version(
    p_app_name in varchar2, 
    p_version in number,
    p_confirm in boolean := false) is 
-   -- Set numeric decimal version for an application.
+   -- Set status to 'SET' or 'CONFIRMED' and set version you are attempting to patch/upgrade too.
    pragma autonomous_transaction;
    n number;
    current_status varchar2(10);
@@ -1241,7 +1435,7 @@ begin
    else
       new_status := 'SET';
    end if;
-   
+
    if n = 0 then 
       insert into app_version (
          app_name,
@@ -1276,6 +1470,7 @@ begin
 end;
 
 procedure confirm_app_version(p_app_name in varchar2) is
+   -- Sets the status of the app version to 'CONFIRMED'.
    pragma autonomous_transaction;
 begin
    update app_version 
@@ -1285,6 +1480,7 @@ begin
 end;
 
 function get_app_version(p_app_name in varchar2) return number is 
+   -- Returns the last 'confirmed' version.
    v_version number;
 begin
    select decode(status, 'SET', last_version, 'CONFIRMED', version)
@@ -1294,22 +1490,46 @@ begin
     return v_version;
 end;
 
-/* SIMPLE KEY VALUE STORE */
+function get_new_version(p_app_name in varchar2) return number is 
+   -- Returns the version you are currently patching or upgrading too.
+   v_version number;
+begin 
+   select version
+     into v_version
+     from app_version 
+    where app_name=upper(p_app_name);
+    return v_version;
+end;
+
+procedure delete_app_version(p_app_name in varchar2) is 
+   -- Deletes the reference to the app from the APP_VERSION table.
+   pragma autonomous_transaction;
+begin 
+  delete from app_version where app_name=upper(p_app_name);
+  commit;
+end;
+
+/* 
+SIMPLE KEY VALUE STORE 
+
+ToDo: 
+- Change input vars so they are consistent.
+*/
 
 procedure cache (
    cache_key varchar2, 
    p_value varchar2) is
    l_value varchar2(4000);
 begin
-   
+
    if not does_cache_key_exist(cache_key) then
       insert into cache (key) values (cache_key);
    end if;
-   
+
    if length(p_value) > 4000 then
       l_value := substr(p_value, 1, 4000);
    end if;
-   
+
    update cache 
       set value=p_value,
           update_time=sysdate
@@ -1346,7 +1566,7 @@ begin
    delete from cache
     where key=lower(cache_key);
 end;
-   
+
 /* CUSTOM SETTINGS */
 
 procedure remove_config (name varchar2) is
@@ -1723,11 +1943,11 @@ begin
    min_elap_secs := get_sql_log_analyze_min_secs;
    -- This is only allowed if you have the license to look at these tables.
    if upper(nvl(arcsql.get_config('sql_log_ash_is_licensed'), 'N')) = 'Y' then
-      
+
       if nvl(arcsql.return_cached_value('sql_log_last_active_sql_hist_update'), 'x') != to_char(sysdate, 'YYYYMMDDHH24') then
-      
+
          arcsql.cache('sql_log_last_active_sql_hist_update', to_char(sysdate, 'YYYYMMDDHH24'));
-         
+
          insert into sql_log_active_session_history (
          datetime,
          sql_id,
@@ -1783,19 +2003,19 @@ procedure sql_log_analyze_window (datetime date default sysdate) is
       and a.elapsed_seconds > min_elap_secs;
 
    total_elap_secs              number;
-   
+
 begin
    total_elap_secs := sql_log_elap_secs_all_sql(sql_log_analyze_window.datetime);
    -- Loop through each row in SQL_LOG in the result set.
    for s in c_sql_log (get_sql_log_analyze_min_secs) loop
-      
+
       -- We check for nulls below and only set once per hour. Once set we don't need to do it again.
 
       -- What is the historical avg elap time per exe in seconds for this SQL?
       if s.norm_elap_secs_per_exe is null then
          s.norm_elap_secs_per_exe := sql_log_norm_elap_secs_per_exe(datetime => sql_log_analyze_window.datetime, sqlid => s.sql_id, forcematchingsignature => s.force_matching_signature);
       end if;
-      
+
       -- What is the historical avg # of executes per hr for this SQL?
       if s.norm_execs_per_hour is null then
          s.norm_execs_per_hour := sql_log_norm_execs_per_hour(datetime=>sql_log_analyze_window.datetime, sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
@@ -1808,7 +2028,7 @@ begin
       if s.norm_rows_processed is null then 
          s.norm_rows_processed := sql_log_norm_rows_processed(datetime=>sql_log_analyze_window.datetime, sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
       end if;
-      
+
       if s.sql_age_in_days is null then
          s.sql_age_in_days := sql_log_age_of_sql_in_days(datetime=>sql_log_analyze_window.datetime, sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
       end if;
@@ -1816,7 +2036,7 @@ begin
       if s.hours_since_last_exe is null then 
          s.hours_since_last_exe := sql_log_hours_since_last_exe(sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
       end if;
-      
+
       if s.sql_last_seen_in_days is null then
          s.sql_last_seen_in_days := sql_log_sql_last_seen_in_days(datetime=>sql_log_analyze_window.datetime, sqlid=>s.sql_id, forcematchingsignature=>s.force_matching_signature);
       end if;
@@ -1824,7 +2044,7 @@ begin
       if s.plan_age_in_days is null then
          s.plan_age_in_days := sql_log_age_of_plan_in_days(datetime=>sql_log_analyze_window.datetime, plan_hash_value=>s.plan_hash_value);
       end if;
-      
+
       s.faster_plans := sql_log_count_of_faster_plans(
          datetime=>s.datetime,
          elap_secs_per_exe=>s.elap_secs_per_exe,
@@ -1832,7 +2052,7 @@ begin
          plan_hash_value=>s.plan_hash_value,
          sqlid=>s.sql_id,
          forcematchingsignature=>s.force_matching_signature);
-         
+
       s.slower_plans := sql_log_count_of_slower_plans(
          datetime=>s.datetime,
          elap_secs_per_exe=>s.elap_secs_per_exe,
@@ -1840,12 +2060,12 @@ begin
          plan_hash_value=>s.plan_hash_value,
          sqlid=>s.sql_id,
          forcematchingsignature=>s.force_matching_signature);
-         
+
       s.elap_secs_per_exe_score := 0;
       if s.norm_elap_secs_per_exe > 0 then
          s.elap_secs_per_exe_score := round(s.elap_secs_per_exe/s.norm_elap_secs_per_exe*100);
       end if;
-          
+
       update sql_log
          set elap_secs_per_exe_score = s.elap_secs_per_exe_score,
              executions_score = decode(norm_execs_per_hour, 0, 0, round(s.executions/s.norm_execs_per_hour*100)),
@@ -1874,7 +2094,7 @@ begin
              sql_log_max_score = greatest(nvl(sql_log_max_score, sql_log_score), nvl(sql_log_score, sql_log_max_score)),
              sql_log_min_score = least(nvl(sql_log_min_score, sql_log_score), nvl(sql_log_score, sql_log_min_score))
        where sql_log_id = s.sql_log_id;
-       
+
    end loop;
 end;
 
@@ -1940,7 +2160,7 @@ procedure run_sql_log_update is
                          and a.force_matching_signature=b.force_matching_signature);
    n number;
    last_elap_secs_per_exe  number;
-   
+
 begin
    select count(*) into n from sql_snap where rownum < 2;
    if n = 0 then
@@ -1965,7 +2185,7 @@ begin
             and plan_hash_value=s.plan_hash_value
             and force_matching_signature=s.force_matching_signature
             and datetime=trunc(sysdate, 'HH24');
-         
+
          if sql%rowcount = 0 then
             -- This is a new SQL and we need to insert it.
             insert into sql_log (
@@ -2010,7 +2230,7 @@ begin
                s.module,
                s.action);
          end if;
-         
+
          if s.executions = 0 then
             last_elap_secs_per_exe := 0;
          else
@@ -2089,7 +2309,13 @@ begin
    end if;
 end;
 
-/* EVENTS */
+/* 
+ -----------------------------------------------------------------------------------
+ Events
+
+ Records event durations in 
+ -----------------------------------------------------------------------------------
+ */
 
 procedure purge_events is 
 /*
@@ -2180,7 +2406,7 @@ begin
       and nvl(subgroup, '~')=nvl(stop_event.subgroup, '~')
       and name=stop_event.name;
 
-   update event set 
+   update arcsql_event set 
       event_count=event_count+1,
       total_secs=total_secs+v_elapsed_seconds,
       last_start_time=v_start_time,
@@ -2190,7 +2416,7 @@ begin
       and name=stop_event.name;
 
    if sql%rowcount = 0 then 
-      insert into event (
+      insert into arcsql_event (
          id,
          event_group,
          subgroup,
@@ -2227,7 +2453,7 @@ Delete all references to an event.
    pragma autonomous_transaction;
    v_audsid number := get_audsid;
 begin 
-   delete from event 
+   delete from arcsql_event 
     where event_group=delete_event.event_group
       and nvl(subgroup, '~')=nvl(delete_event.subgroup, '~')
       and name=delete_event.name;
@@ -2238,40 +2464,39 @@ exception
       raise;
 end;
 
-/* BUILT IN JOB WINDOWS */
+/* 
+-----------------------------------------------------------------------------------
+Task Scheduling
+-----------------------------------------------------------------------------------
+*/
 
-procedure run is 
-   n number;
+procedure start_arcsql is 
+   cursor tasks is 
+   select * from all_scheduler_jobs 
+    where job_name like 'ARCSQL%';
 begin 
-   if not does_matching_job_exist('arcsql.run_every_1_minutes') then
-      dbms_job.submit(n, 'arcsql.run_every_1_minutes;', sysdate+(1/1440), 'sysdate+(1/1440)');
-   end if;
-   if not does_matching_job_exist('arcsql.run_every_5_minutes') then
-      dbms_job.submit(n, 'arcsql.run_every_5_minutes;', sysdate+(5/1440), 'sysdate+(5/1440)');
-   end if;
+   for task in tasks loop 
+      dbms_scheduler.enable(task.job_name);
+   end loop;
    commit;
 end;
 
-procedure stop is 
+procedure stop_arcsql is 
+   cursor tasks is 
+   select * from all_scheduler_jobs 
+    where job_name like 'ARCSQL%';
 begin 
-   remove_matching_jobs('arcsql.run_every_');
+   for task in tasks loop 
+      dbms_scheduler.disable(task.job_name);
+   end loop;
    commit;
 end;
 
-procedure run_every_1_minutes is 
-begin 
-   set_counter(counter_group=>'arcsql', subgroup=>'task_scheduler', name=>'run_every_1_minutes', add=>1);
-   commit;
-end;
-
-procedure run_every_5_minutes is 
-begin 
-   run_sql_log_update;
-   purge_events;
-   commit;
-end;
-
-/* LOGGING */
+/* 
+-----------------------------------------------------------------------------------
+Logging
+-----------------------------------------------------------------------------------
+*/
 
 procedure log_interface (
    log_text in varchar2, 
@@ -2322,21 +2547,18 @@ procedure debug (debug_text in varchar2, debug_key in varchar2 default null, deb
    pragma autonomous_transaction;
 begin
    log_interface(debug_text, debug_key, debug_tags, 1, 'debug');
-   dbms_output.put_line('debug: '||debug_text);
 end;
 
 procedure debug2 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null) is 
    pragma autonomous_transaction;
 begin
    log_interface(debug_text, debug_key, debug_tags, 2, 'debug2');
-   dbms_output.put_line('debug2: '||debug_text);
 end;
 
 procedure debug3 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null) is 
    pragma autonomous_transaction;
 begin
    log_interface(debug_text, debug_key, debug_tags, 3, 'debug3');
-   dbms_output.put_line('debug3: '||debug_text);
 end;
 
 procedure alert (alert_text in varchar2, alert_key in varchar2 default null, alert_tags in varchar2 default null) is 
@@ -2359,11 +2581,11 @@ begin
    test;
 end;
 
-procedure fail_test is 
+procedure fail_test(fail_message in varchar2 default null) is 
 begin 
    test_passed := 0;
    test;
-   raise_application_error(-20001, '*** Unit Test Failure ***');
+   raise_application_error(-20001, '*** Failure *** '||fail_message);
 end;
 
 procedure test is 
@@ -2384,7 +2606,6 @@ end;
 
 procedure init_test(test_name varchar2) is 
 begin
-   arcsql.debug('init_test: '||test_name);
    test_passed := -1;
    assert := true;
    assert_true := true;
@@ -2392,10 +2613,460 @@ begin
    arcsql.test_name := init_test.test_name;
 end;
 
+ /* 
+ -----------------------------------------------------------------------------------
+ Application Test Framework
+ -----------------------------------------------------------------------------------
+ */
+
+function app_test_profile_not_set return boolean is 
+begin 
+   if g_app_test_profile.profile_name is null then 
+      return true;
+   else 
+      return false;
+   end if;
+end;
+
+procedure add_app_test_profile (
+   p_profile_name in varchar2,
+   p_env_type in varchar2 default null,
+   p_is_default in varchar2 default 'N',
+   p_test_interval in number default 0,
+   p_recheck_interval in number default 0,
+   p_retry_count in number default 0,
+   p_retry_interval in number default 0,
+   p_retry_keyword in varchar2 default 'retry',
+   p_failed_keyword in varchar2 default 'warning',
+   p_reminder_interval in number default 60,
+   p_reminder_keyword in varchar2 default 'warning',
+   -- Interval is multiplied by this # each time a reminder is sent to set the next interval.
+   p_reminder_backoff in number default 1,
+   p_abandon_interval in varchar2 default null,
+   p_abandon_keyword in varchar2 default 'abandon',
+   p_abandon_reset in varchar2 default 'N',
+   p_pass_keyword in varchar2 default 'passed'
+   ) is
+begin
+   if not does_app_test_profile_exist(p_profile_name, p_env_type) then
+      g_app_test_profile := null;
+      g_app_test_profile.profile_name := p_profile_name;
+      g_app_test_profile.env_type := p_env_type;
+      g_app_test_profile.is_default := p_is_default;
+      g_app_test_profile.test_interval := p_test_interval;
+      g_app_test_profile.recheck_interval := p_recheck_interval;
+      g_app_test_profile.retry_count := p_retry_count;
+      g_app_test_profile.retry_interval := p_retry_interval;
+      g_app_test_profile.retry_keyword := p_retry_keyword;
+      g_app_test_profile.failed_keyword := p_failed_keyword;
+      g_app_test_profile.reminder_interval := p_reminder_interval;
+      g_app_test_profile.reminder_keyword := p_reminder_keyword;
+      g_app_test_profile.reminder_backoff := p_reminder_backoff;
+      g_app_test_profile.abandon_interval := p_abandon_interval;
+      g_app_test_profile.abandon_keyword := p_abandon_keyword;
+      g_app_test_profile.abandon_reset := p_abandon_reset;
+      g_app_test_profile.pass_keyword := p_pass_keyword;
+      save_app_test_profile;
+   end if;
+end;
+
+procedure set_app_test_profile (
+   p_profile_name in varchar2 default null,
+   p_env_type in varchar2 default null) is 
+   -- Set g_app_test_profile. If env type not found try where env type is null.
+   n number;
+   
+   function set_exact_app_profile return boolean is 
+   -- Match profile name and env type (could be null).
+   begin 
+      select * into g_app_test_profile 
+        from app_test_profile 
+       where profile_name=p_profile_name 
+         and nvl(env_type, 'x')=nvl(p_env_type, 'x');
+      return true;
+   exception 
+      when others then 
+         return false;
+   end;
+
+   function set_default_app_profile return boolean is 
+   -- Match default profile if configured.
+   begin 
+      select * into g_app_test_profile 
+        from app_test_profile 
+       where is_default='Y'
+         and 'x'=nvl(p_profile_name, 'x')
+         and 'x'=nvl(p_env_type, 'x');
+      return true;
+   exception 
+      when others then 
+         return false;
+   end;
+
+begin 
+   if set_exact_app_profile then 
+      return;
+   end if;
+   if set_default_app_profile then 
+      return;
+   end if;
+   raise_application_error('-20001', 'Matching app profile not found.');
+end;
+
+procedure raise_app_test_profile_not_set is 
+begin 
+   if app_test_profile_not_set then 
+      raise_application_error('-20001', 'Application test profile not set.');
+   end if;
+end;
+
+procedure save_app_test_profile is 
+  pragma autonomous_transaction;
+begin  
+   raise_app_test_profile_not_set;
+
+   -- Each env type can only have one default profile associated with it.
+   if g_app_test_profile.is_default='Y' then 
+      update app_test_profile set is_default='N'
+       where is_default='Y' 
+         and nvl(env_type, 'x')=nvl(g_app_test_profile.env_type, 'x');
+   end if;
+
+   update app_test_profile set row=g_app_test_profile 
+    where profile_name=g_app_test_profile.profile_name
+      and nvl(env_type, 'x')=nvl(g_app_test_profile.env_type, 'x');
+
+   if sql%rowcount = 0 then 
+      insert into app_test_profile values g_app_test_profile;
+   end if;
+
+   commit;
+end;
+
+function does_app_test_profile_exist (
+   p_profile_name in varchar2,
+   p_env_type in varchar2 default null) return boolean is 
+   n number;
+begin 
+   select count(*) into n 
+     from app_test_profile 
+    where profile_name=p_profile_name
+      and nvl(env_type, 'x')=nvl(p_env_type, 'x');
+   if n > 0 then 
+      return true;
+   else 
+      return false;
+   end if;
+end;
+
+procedure set_default_app_test_profile is 
+   n number;
+begin 
+   -- Try to set default by calling set with no parms.
+   set_app_test_profile;
+end;
+
+procedure raise_app_test_not_set is 
+begin
+   if g_app_test.test_name is null then 
+      raise_application_error('-20001', 'Application test not set.');
+   end if;
+end;
+
+function init_app_test (p_test_name varchar2) return boolean is
+   -- Returns true if the test is enabled and it is time to run the test.
+   pragma autonomous_transaction;
+   n number;
+   time_to_test boolean := false;
+
+   function test_interval return boolean is 
+   begin
+      if nvl(g_app_test.test_end_time, sysdate-999) + g_app_test_profile.test_interval/1440 <= sysdate then 
+         return true;
+      else 
+         return false;
+      end if;
+   end;
+
+   function retry_interval return boolean is 
+   begin 
+      if g_app_test.test_end_time + g_app_test_profile.retry_interval/1440 <= sysdate then
+         return true;
+      else
+         return false;
+      end if;
+   end;
+
+   function recheck_interval return boolean is 
+   begin 
+      if nvl(g_app_test_profile.recheck_interval, -1) > -1 then 
+         if g_app_test.test_end_time + g_app_test_profile.recheck_interval/1440 <= sysdate then 
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+begin
+   if app_test_profile_not_set then 
+      set_default_app_test_profile;
+   end if;
+   raise_app_test_profile_not_set;
+   select count(*) into n from app_test 
+    where test_name=p_test_name;
+   if n = 0 then 
+      insert into app_test (
+         test_name,
+         test_start_time,
+         test_end_time,
+         reminder_interval) values (
+         p_test_name,
+         sysdate,
+         null,
+         g_app_test_profile.reminder_interval);
+      commit;
+      time_to_test := true;
+   end if;
+   select * into g_app_test from app_test where test_name=p_test_name;
+   if g_app_test.enabled='N' then 
+      return false;
+   end if;
+   if not g_app_test.test_start_time is null and 
+      g_app_test.test_end_time is null then 
+      -- ToDo: Log an error here but do not throw an error.
+      null;
+   end if;
+   if g_app_test.test_status in ('RETRY') and retry_interval then 
+      if not g_app_test_profile.retry_keyword is null then
+         arcsql.log(
+            log_text=>'['||g_app_test_profile.retry_keyword||'] Application test '''||g_app_test.test_name||''' is being retried.',
+            log_key=>'app_test');
+      end if;
+      time_to_test := true;
+   end if;
+   if g_app_test.test_status in ('FAIL', 'ABANDON') and (recheck_interval or test_interval) then 
+      time_to_test := true;
+   end if;
+   if g_app_test.test_status in ('PASS') and test_interval then 
+      time_to_test := true;
+   end if;
+   if time_to_test then 
+      debug2('time_to_test=true');
+      g_app_test.test_start_time := sysdate;
+      g_app_test.test_end_time := null;
+      g_app_test.total_test_count := g_app_test.total_test_count + 1;
+      save_app_test;
+      return true;
+   else 
+      debug2('time_to_test=false');
+      return false;
+   end if;
+end;
+
+procedure reset_app_test_profile is 
+begin 
+   raise_app_test_profile_not_set;
+   set_app_test_profile(
+     p_profile_name=>g_app_test_profile.profile_name,
+     p_env_type=>g_app_test_profile.env_type);
+end;
+
+procedure app_test_check is 
+   -- Sends reminders and changes status to ABANDON when test status is currently FAIL.
+
+   function abandon_interval return boolean is 
+   -- Returns true if it is time to abandon this test.
+   begin 
+      if nvl(g_app_test_profile.abandon_interval, 0) > 0 then 
+         if g_app_test.failed_time + g_app_test_profile.abandon_interval/1440 <= sysdate then 
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+   procedure abandon_test is 
+   -- Performs necessary actions when test status changes to 'ABANDON'.
+   begin 
+      g_app_test.abandon_time := sysdate;
+      g_app_test.total_abandons := g_app_test.total_abandons + 1;
+      if not g_app_test_profile.abandon_keyword is null then 
+         arcsql.log(
+            log_text=>'['||g_app_test_profile.abandon_keyword||'] Application test '''||g_app_test.test_name||''' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
+            log_key=>'app_test');
+      end if;
+      -- If reset is Y the test changes back to PASS and will likely FAIL on the next check and cycle through the whole process again.
+      if nvl(g_app_test_profile.abandon_reset, 'N') = 'N' then 
+         g_app_test.test_status := 'ABANDON';
+      else 
+         g_app_test.test_status := 'PASS';
+      end if;
+   end;
+
+   procedure set_next_reminder_interval is 
+   begin 
+      g_app_test.reminder_interval := g_app_test.reminder_interval * g_app_test_profile.reminder_backoff;
+   end;
+
+   function time_to_remind return boolean is 
+   -- Return true if it is time to log a reminder for a FAIL'd test.
+   begin 
+      if nvl(g_app_test.reminder_interval, 0) > 0 and g_app_test.test_status in ('FAIL') then  
+         if g_app_test.last_reminder_time + g_app_test.reminder_interval/1440 <= sysdate then
+            set_next_reminder_interval;
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+   procedure do_app_test_reminder is 
+   -- Perform actions required when it is time to send a reminder.
+   begin 
+      g_app_test.last_reminder_time := sysdate;
+      g_app_test.reminder_count := g_app_test.reminder_count + 1;
+      g_app_test.total_reminders := g_app_test.total_reminders + 1;
+      if not g_app_test_profile.reminder_keyword is null then
+         arcsql.log(
+            log_text=>'['||g_app_test_profile.reminder_keyword||'] A reminder that application test '''||g_app_test.test_name||''' is still failing.',
+            log_key=>'app_test');
+      end if;
+   end;
+
+begin 
+   raise_app_test_not_set;
+   if g_app_test.test_status in ('FAIL') then 
+      if abandon_interval then 
+         abandon_test;
+      elsif time_to_remind then 
+         do_app_test_reminder;
+      end if;
+   end if;
+   save_app_test;
+end;
+
+procedure app_test_fail (p_message in varchar2 default null) is 
+   -- Called by the test developer anytime the app test fails.
+   
+   function retries_not_configured return boolean is
+   -- Return true if retries are configured for the currently set app test profile.
+   begin 
+      if nvl(g_app_test_profile.retry_count, 0) = 0 then 
+         return true;
+      else 
+         return false;
+      end if;
+   end;
+
+   procedure do_app_test_fail is 
+   -- Perform the actions required when a test status changes to FAIL.
+   begin 
+      g_app_test.test_status := 'FAIL';
+      g_app_test.failed_time := g_app_test.test_end_time;
+      g_app_test.last_reminder_time := g_app_test.test_end_time;
+      g_app_test.total_failures := g_app_test.total_failures + 1;
+      if not g_app_test_profile.failed_keyword is null then 
+         arcsql.log(
+            log_text=>'['||g_app_test_profile.failed_keyword||'] Application test '''||g_app_test.test_name||''' has failed.',
+            log_key=>'app_test');
+      end if;
+   end;
+
+   function app_test_pass_fail_already_called return boolean is 
+   begin
+      if not g_app_test.test_end_time is null then
+         return true;
+      else
+         return false;
+      end if;
+   end;
+
+begin 
+   raise_app_test_not_set;
+   if app_test_pass_fail_already_called then 
+      return;
+   end if;
+   arcsql.debug2('app_test_fail');
+   g_app_test.test_end_time := sysdate;
+   g_app_test.message := p_message;
+   if g_app_test.test_status in ('PASS') then 
+      if retries_not_configured then 
+         do_app_test_fail;
+      else
+         g_app_test.test_status := 'RETRY';
+      end if;
+   elsif g_app_test.test_status in ('RETRY') then 
+      g_app_test.total_retries := g_app_test.total_retries + 1;
+      g_app_test.retry_count := g_app_test.retry_count + 1;
+      if nvl(g_app_test.retry_count, 0) >= g_app_test_profile.retry_count or 
+         -- If retries are not configured they have been changed and were configured previously or we could
+         -- never get to a RETRY state. We will simply fail if this is the case.
+         retries_not_configured then 
+         do_app_test_fail;
+      end if;
+   end if;
+   app_test_check;
+   save_app_test;
+end;
+
+procedure app_test_pass is 
+   -- Called by the test developer anytime the app test passes.
+   
+   procedure do_app_pass_test is 
+   begin 
+      if g_app_test.test_status in ('RETRY') then 
+         g_app_test.total_retries := g_app_test.total_retries + 1;
+      end if;
+      g_app_test.test_status := 'PASS';
+      g_app_test.passed_time := g_app_test.test_end_time;
+      g_app_test.reminder_count := 0;
+      g_app_test.reminder_interval := g_app_test_profile.reminder_interval;
+      g_app_test.retry_count := 0;
+      if not g_app_test_profile.pass_keyword is null then
+         arcsql.log (
+            log_text=>'['||g_app_test_profile.pass_keyword||'] Application test '''||g_app_test.test_name||''' is now passing.',
+            log_key=>'app_test');
+      end if;
+   end;
+
+   function app_test_pass_fail_already_called return boolean is 
+   begin
+      if not g_app_test.test_end_time is null then
+         return true;
+      else
+         return false;
+      end if;
+   end;
+
+begin 
+   raise_app_test_not_set;
+   if app_test_pass_fail_already_called then 
+      return;
+   end if;
+   arcsql.debug2('app_test_pass');
+   g_app_test.test_end_time := sysdate;
+   if g_app_test.test_status not in ('PASS') or g_app_test.passed_time is null then 
+      do_app_pass_test;
+   end if;
+   save_app_test;
+end;
+
+procedure app_test_done is 
+   -- Marks completion of test. Not required but auto passes any test if fail has not been called. 
+begin 
+   -- This only runs if app_test_fail has not already been called.
+   app_test_pass;
+end;
+
+procedure save_app_test is 
+   pragma autonomous_transaction;
+begin 
+   update app_test set row=g_app_test where test_name=g_app_test.test_name;
+   commit;
+end;
+
 end;
 /
-
-show errors
 
 alter package arcsql compile;
 alter package arcsql compile body;
@@ -2414,6 +3085,21 @@ exec arcsql.add_config('arcsql_version', '0.0', 'ArcSQL Version - Do not edit th
 exec arcsql.add_config('purge_event_hours', '4', 'ArcSQL purges data from session_event table older than X hours.');
 
 exec arcsql.set_config('arcsql_version', '0.11');
+
+begin
+  if not does_scheduler_job_exist('arcsql_run_sql_log_update') then 
+     dbms_scheduler.create_job (
+       job_name        => 'arcsql_run_sql_log_update',
+       job_type        => 'PLSQL_BLOCK',
+       job_action      => 'begin arcsql.run_sql_log_update; end;',
+       start_date      => systimestamp,
+       repeat_interval => 'freq=minutely;interval=5',
+       enabled         => true);
+   end if;
+end;
+/
+
+
 
 
 /*
