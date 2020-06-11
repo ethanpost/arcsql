@@ -1199,14 +1199,14 @@ begin
    delete from audsid_event where start_time < sysdate-v_hours/24;
 end;
 
-procedure start_event (event_group varchar2, subgroup varchar2, name varchar2) is 
-/*
-Start timing an event.
->>> start_event (event_group, subgroup, name);
--event_group: Event group (string). Required.
--subgroup: Event subgroup (string). Can be null.
--name: Event name (string). Unique within a event_group and sub_group.
-*/
+procedure start_event (
+   event_group in varchar2, 
+   subgroup in varchar2, 
+   name in varchar2) is 
+-- Start an event timer (autonomous transaction).
+-- event_group: Event group (string). Required.
+-- subgroup: Event subgroup (string). Can be null.
+-- name: Event name (string). Unique within a event_group/sub_group.
    v_audsid number := get_audsid;
    pragma autonomous_transaction;
 begin 
@@ -1214,7 +1214,7 @@ begin
       set start_time=sysdate 
     where audsid=v_audsid
       and event_group=start_event.event_group
-      and nvl(subgroup, '~')=nvl(start_event.subgroup, '~')
+      and nvl(subgroup, 'x')=nvl(start_event.subgroup, 'x')
       and name=start_event.name;
    -- ToDo: If 1 we may need to log a "miss".
    if sql%rowcount = 0 then 
@@ -1238,21 +1238,18 @@ exception
       raise;
 end;
 
-procedure stop_event (event_group varchar2, subgroup varchar2, name varchar2) is 
-/*
-Stop timing an event.
->>> stop_event (event_group, subgroup, name);
--event_group: Event group (string). Required.
--subgroup: Event subgroup (string). Can be null.
--name: Event name (string). Unique within a event_group and sub_group.
-*/
+procedure stop_event (
+   event_group in varchar2, 
+   subgroup in varchar2, 
+   name in varchar2) is 
+-- Stop timing an event.
    v_start_time date;
    v_stop_time date;
    v_elapsed_seconds number;
    v_audsid number := get_audsid;
    pragma autonomous_transaction;
 begin 
-
+   -- Figure out the amount of time elapsed.
    begin
       select start_time,
              sysdate stop_time,
@@ -1263,7 +1260,7 @@ begin
         from audsid_event 
        where audsid=v_audsid
          and event_group=stop_event.event_group
-         and nvl(subgroup, '~')=nvl(stop_event.subgroup, '~')
+         and nvl(subgroup, 'x')=nvl(stop_event.subgroup, 'x')
          and name=stop_event.name;
    exception
       when no_data_found then 
@@ -1271,12 +1268,14 @@ begin
          return;
    end;
 
+   -- Delete the reference we use to calc elap time for this event/session.
    delete from audsid_event
     where audsid=v_audsid
       and event_group=stop_event.event_group
-      and nvl(subgroup, '~')=nvl(stop_event.subgroup, '~')
+      and nvl(subgroup, 'x')=nvl(stop_event.subgroup, 'x')
       and name=stop_event.name;
 
+   -- Update the consolidated record in the arcsql_event table.
    update arcsql_event set 
       event_count=event_count+1,
       total_secs=total_secs+v_elapsed_seconds,
@@ -1313,20 +1312,17 @@ exception
       raise;
 end;
 
-procedure delete_event (event_group varchar2, subgroup varchar2, name varchar2) is 
-/*
-Delete all references to an event.
->>> delete_event (event_group, subgroup, name);
--event_group: Event group (string). Required.
--subgroup: Event subgroup (string). Can be null.
--name: Event name (string). Unique within a event_group and sub_group.
-*/
+procedure delete_event (
+   event_group in varchar2, 
+   subgroup in varchar2, 
+   name in varchar2) is 
+-- Delete event data.
    pragma autonomous_transaction;
    v_audsid number := get_audsid;
 begin 
    delete from arcsql_event 
     where event_group=delete_event.event_group
-      and nvl(subgroup, '~')=nvl(delete_event.subgroup, '~')
+      and nvl(subgroup, 'x')=nvl(delete_event.subgroup, 'x')
       and name=delete_event.name;
    commit;
 exception

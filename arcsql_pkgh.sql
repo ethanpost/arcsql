@@ -152,12 +152,18 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
-   -- Starts an event. It is linked to the current session.
-   procedure start_event (event_group varchar2, subgroup varchar2, name varchar2);
-   -- Stops an event. Must have been started within the same session.
-   procedure stop_event (event_group varchar2, subgroup varchar2, name varchar2);
-   -- Deletes an event from the event table. This is a global action, not session.
-   procedure delete_event (event_group varchar2, subgroup varchar2, name varchar2);
+   procedure start_event (
+      event_group in varchar2, 
+      subgroup in varchar2, 
+      name in varchar2);
+   procedure stop_event (
+      event_group in varchar2, 
+      subgroup in varchar2, 
+      name in varchar2);
+   procedure delete_event (
+      event_group in varchar2, 
+      subgroup in varchar2, 
+      name in varchar2);
    procedure purge_events;
 
    /* 
