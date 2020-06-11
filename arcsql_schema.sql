@@ -446,8 +446,7 @@ create or replace view sql_snap_view as (
 /* COUNTERS */
 
 -- uninstall: drop sequence seq_counter_id;
--- uninstall: drop table counter;
-drop table counter;
+-- uninstall: drop table arcsql_counter;
 begin
    if not does_sequence_exist('seq_counter_id') then 
       execute_sql('create sequence seq_counter_id');

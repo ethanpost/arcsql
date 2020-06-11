@@ -28,6 +28,27 @@ end;
 
 /* 
 -----------------------------------------------------------------------------------
+Timer
+-----------------------------------------------------------------------------------
+*/
+
+procedure start_time is 
+begin 
+   -- Sets the timer variable to current time.
+   g_timer_start := sysdate;
+end;
+
+function get_time return number is 
+   -- Returns seconds since last call to 'get_time' or 'start_time' (within the same session).
+   r number;
+begin 
+   r := round((sysdate-nvl(g_timer_start, sysdate))*24*60*60, 1);
+   g_timer_start := sysdate;
+   return r;
+end;
+
+/* 
+-----------------------------------------------------------------------------------
 Strings
 -----------------------------------------------------------------------------------
 */
