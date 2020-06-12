@@ -227,6 +227,7 @@ begin
       sql_log_total_score          number,
       sql_log_score_count          number,
       sql_log_avg_score            number,
+      rolling_avg_score            varchar2(120) default null,
       sql_log_max_score            number,
       sql_log_min_score            number,
       secs_between_snaps           number,
@@ -295,6 +296,10 @@ begin
 
    if not does_column_exist(table_name => 'sql_log', column_name => 'sql_log_min_score') then 
       execute_sql('alter table sql_log add (sql_log_min_score number)', false);
+   end if;
+
+   if not does_column_exist(table_name => 'sql_log', column_name => 'rolling_avg_score') then 
+      execute_sql('alter table sql_log add (rolling_avg_score varchar2(120) default null)', false);
    end if;
    
 end;

@@ -41,13 +41,30 @@ create or replace package arcsql as
 
    -- Borrowed and adapted from the ora_complexity_check function.
    function str_complexity_check
-   (text   varchar2,
-    chars      integer := null,
-    letter     integer := null,
-    uppercase  integer := null,
-    lowercase  integer := null,
-    digit      integer := null,
-    special    integer := null) return boolean;
+      (text   varchar2,
+       chars      integer := null,
+       letter     integer := null,
+       uppercase  integer := null,
+       lowercase  integer := null,
+       digit      integer := null,
+       special    integer := null) return boolean;
+
+   function get_token (
+      p_list  varchar2,
+      p_index number,
+      p_delim varchar2 := ',') return varchar2;
+
+   function shift_list (
+      p_list in varchar2,
+      p_token in varchar2 default ',',
+      p_shift_count in number default 1,
+      p_max_items in number default null) return varchar2;
+
+   function get_new_list (
+      p_list in varchar2,
+      p_new_num in number default null,
+      p_token in varchar2 default ',',
+      p_max_tokens in number default 1) return varchar2;
 
    /* 
    -----------------------------------------------------------------------------------

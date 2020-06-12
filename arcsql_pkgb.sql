@@ -198,6 +198,63 @@ begin
    return true;
 end;
 
+function get_token (
+   p_list  varchar2,
+   p_index number,
+   p_delim varchar2 := ',') return varchar2 is 
+   start_pos number;
+   end_pos   number;
+begin
+   if p_index = 1 then
+       start_pos := 1;
+   else
+       start_pos := instr(p_list, p_delim, 1, p_index - 1);
+       if start_pos = 0 then
+           return null;
+       else
+           start_pos := start_pos + length(p_delim);
+       end if;
+   end if;
+
+   end_pos := instr(p_list, p_delim, start_pos, 1);
+
+   if end_pos = 0 then
+       return substr(p_list, start_pos);
+   else
+       return substr(p_list, start_pos, end_pos - start_pos);
+   end if;
+exception
+   when others then
+      raise;
+end get_token;
+
+function shift_list (
+   p_list in varchar2,
+   p_token in varchar2 default ',',
+   p_shift_count in number default 1,
+   p_max_items in number default null) return varchar2 is 
+   token_count number;
+   v_list varchar2(1000) := p_list;
+   v_shift_count number := p_shift_count;
+begin 
+   if not p_max_items is null then 
+      token_count := regexp_count(v_list, p_token);
+      v_shift_count := (token_count + 1) - p_max_items;
+   end if;
+   if v_shift_count <= 0 then 
+      return v_list;
+   end if;
+   for i in 1 .. v_shift_count loop 
+      token_count := regexp_count(v_list, p_token);
+      if token_count = 0 then 
+         return null;
+      else 
+         v_list := substr(v_list, instr(v_list, p_token)+1);
+      end if;
+   end loop;
+   return trim(v_list);
+end;
+
 /* 
 -----------------------------------------------------------------------------------
 Numbers
