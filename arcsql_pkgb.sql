@@ -234,15 +234,19 @@ function shift_list (
    p_shift_count in number default 1,
    p_max_items in number default null) return varchar2 is 
    token_count number;
-   v_list varchar2(1000) := p_list;
+   v_list varchar2(1000) := trim(p_list);
    v_shift_count number := p_shift_count;
 begin 
+   if p_list is null or 
+      length(trim(p_list)) = 0 then
+      return null;
+   end if;
    if not p_max_items is null then 
       token_count := regexp_count(v_list, p_token);
       v_shift_count := (token_count + 1) - p_max_items;
    end if;
    if v_shift_count <= 0 then 
-      return v_list;
+      return trim(v_list);
    end if;
    for i in 1 .. v_shift_count loop 
       token_count := regexp_count(v_list, p_token);
@@ -1140,7 +1144,8 @@ procedure run_sql_log_update is
                          and a.force_matching_signature=b.force_matching_signature);
    n number;
    last_elap_secs_per_exe  number;
-
+   v_sql_log sql_log%rowtype;
+   max_datetime date;
 begin
    select count(*) into n from sql_snap where rownum < 2;
    if n = 0 then
@@ -1167,7 +1172,31 @@ begin
             and datetime=trunc(sysdate, 'HH24');
 
          if sql%rowcount = 0 then
-            -- This is a new SQL and we need to insert it.
+
+            -- Try to load previous record if it exist.
+            select max(datetime) into max_datetime 
+              from sql_log
+             where sql_id=s.sql_id 
+               and plan_hash_value=s.plan_hash_value 
+               and force_matching_signature=s.force_matching_signature 
+               and datetime!=trunc(sysdate, 'HH24');
+
+            if not max_datetime is null then 
+               select * into v_sql_log
+                 from sql_log 
+                where sql_id=s.sql_id 
+                  and plan_hash_value=s.plan_hash_value 
+                  and force_matching_signature=s.force_matching_signature 
+                  and datetime!=max_datetime;
+               v_sql_log.rolling_avg_score := shift_list(
+                  p_list=>v_sql_log.rolling_avg_score,
+                  p_token=>',',
+                  p_max_items=>24) || ',' || to_char(v_sql_log.sql_log_avg_score);
+            else 
+               v_sql_log.rolling_avg_score := null;
+            end if;
+
+            -- This is a new SQL or new hour and we need to insert it.
             insert into sql_log (
                sql_log_id, 
                sql_id, 
@@ -1187,6 +1216,7 @@ begin
                sql_log_score_count,
                sql_log_total_score,
                sql_log_avg_score,
+               rolling_avg_score,
                service,
                module,
                action) values (
@@ -1206,9 +1236,11 @@ begin
                0,
                0,
                null,
+               v_sql_log.rolling_avg_score,
                s.service,
                s.module,
                s.action);
+
          end if;
 
          if s.executions = 0 then

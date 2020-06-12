@@ -60,12 +60,6 @@ create or replace package arcsql as
       p_shift_count in number default 1,
       p_max_items in number default null) return varchar2;
 
-   function get_new_list (
-      p_list in varchar2,
-      p_new_num in number default null,
-      p_token in varchar2 default ',',
-      p_max_tokens in number default 1) return varchar2;
-
    /* 
    -----------------------------------------------------------------------------------
    Numbers
