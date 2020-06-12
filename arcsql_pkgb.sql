@@ -1145,7 +1145,6 @@ procedure run_sql_log_update is
    n number;
    last_elap_secs_per_exe  number;
    v_sql_log sql_log%rowtype;
-   max_datetime date;
 begin
    select count(*) into n from sql_snap where rownum < 2;
    if n = 0 then
@@ -1174,20 +1173,20 @@ begin
          if sql%rowcount = 0 then
 
             -- Try to load previous record if it exist.
-            select max(datetime) into max_datetime 
+            select max(datetime) into v_sql_log.datetime 
               from sql_log
              where sql_id=s.sql_id 
                and plan_hash_value=s.plan_hash_value 
                and force_matching_signature=s.force_matching_signature 
                and datetime!=trunc(sysdate, 'HH24');
 
-            if not max_datetime is null then 
+            if not v_sql_log.datetime  is null then 
                select * into v_sql_log
                  from sql_log 
                 where sql_id=s.sql_id 
                   and plan_hash_value=s.plan_hash_value 
                   and force_matching_signature=s.force_matching_signature 
-                  and datetime!=max_datetime;
+                  and datetime!=v_sql_log.datetime;
                v_sql_log.rolling_avg_score := shift_list(
                   p_list=>v_sql_log.rolling_avg_score,
                   p_token=>',',
