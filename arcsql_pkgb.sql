@@ -1186,7 +1186,7 @@ begin
                 where sql_id=s.sql_id 
                   and plan_hash_value=s.plan_hash_value 
                   and force_matching_signature=s.force_matching_signature 
-                  and datetime!=v_sql_log.datetime;
+                  and datetime=v_sql_log.datetime;
                v_sql_log.rolling_avg_score := shift_list(
                   p_list=>v_sql_log.rolling_avg_score,
                   p_token=>',',

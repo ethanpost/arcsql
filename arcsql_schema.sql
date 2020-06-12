@@ -254,6 +254,10 @@ begin
       execute_sql('create index sql_log_4 on sql_log (sql_log_id)', false);
    end if;
 
+   if not does_index_exist('sql_log_5') then
+      execute_sql('create unique index sql_log_5 on sql_log (sql_id, plan_hash_value, force_matching_signature, datetime)', false);
+   end if;
+
    if not does_column_exist(table_name => 'sql_log', column_name => 'norm_user_io_wait_secs') then 
       execute_sql('alter table sql_log add (norm_user_io_wait_secs number)', false);
    end if;
