@@ -193,14 +193,90 @@ create or replace package arcsql as
    */
 
    log_level number default 1;
-   procedure log (log_text in varchar2, log_key in varchar2 default null, log_tags in varchar2 default null);
-   procedure audit (audit_text in varchar2, audit_key in varchar2 default null, audit_tags in varchar2 default null);
-   procedure err (error_text in varchar2, error_key in varchar2 default null, error_tags in varchar2 default null);
-   procedure debug (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null);
-   procedure debug2 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null);
-   procedure debug3 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null);
-   procedure alert (alert_text in varchar2, alert_key in varchar2 default null, alert_tags in varchar2 default null);
-   procedure fail (fail_text in varchar2, fail_key in varchar2 default null, fail_tags in varchar2 default null);
+
+   procedure log_interface (
+      p_text in varchar2, 
+      p_key in varchar2, 
+      p_tags in varchar2,
+      p_level in number,
+      p_type in varchar2,
+      p_metric_name_1 in varchar2 default null,
+      p_metric_1 in number default null,
+      p_metric_name_2 in varchar2 default null,
+      p_metric_2 in number default null
+      );
+
+   procedure log (
+      log_text in varchar2, 
+      log_key in varchar2 default null, 
+      log_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure audit (
+      audit_text in varchar2, 
+      audit_key in varchar2 default null, 
+      audit_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure err (
+      error_text in varchar2, 
+      error_key in varchar2 default null, 
+      error_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure debug (
+      debug_text in varchar2, 
+      debug_key in varchar2 default null, 
+      debug_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure debug2 (
+      debug_text in varchar2, 
+      debug_key in varchar2 default null, 
+      debug_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure debug3 (
+      debug_text in varchar2, 
+      debug_key in varchar2 default null, 
+      debug_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure alert (
+      alert_text in varchar2, 
+      alert_key in varchar2 default null, 
+      alert_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure fail (
+      fail_text in varchar2, 
+      fail_key in varchar2 default null, 
+      fail_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
    
    /* 
    -----------------------------------------------------------------------------------

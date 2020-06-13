@@ -1,12 +1,17 @@
 
 create or replace procedure arcsql_canary_sql as 
    n number;
+   t number;
 begin
    arcsql.start_time;
    select /* arcsql_canary_1 */ count(*) into n from gv$sql;
-   -- ToDo: Track as stats when that feature is developed.
-   -- ToDo: Add elapsed time to log entry.
-   arcsql.log('arcsql_canary_1.rowcount: Returned '||n||' rows in '||arcsql.get_time||' seconds.');
+   t := arcsql.get_time;
+   arcsql.log(
+      log_text=>'''arcsql_canary_1'' returned '||n||' rows in '||t||' seconds.',
+      metric_name_1=>'sql_canary_1_rowcount',
+      metric_1=>n,
+      metric_name_2=>'sql_canary_1_elap_sec',
+      metric_2=>t);
 end;
 /
 

@@ -7,6 +7,9 @@ Datetime
 */
 
 function secs_between_timestamps (time_start in timestamp, time_end in timestamp) return number is
+   -- Return the number of seconds between two timestamps.
+   -- Doing date math with date type is easy. This function tries to make it just as simple to 
+   -- work with a timestamp.
    total_secs number;
    d interval day(9) to second(6);
 begin
@@ -1523,78 +1526,210 @@ Logging
 */
 
 procedure log_interface (
-   log_text in varchar2, 
-   log_key in varchar2, 
-   log_tags in varchar2,
-   log_level in number,
-   log_type in varchar2
+   p_text in varchar2, 
+   p_key in varchar2, 
+   p_tags in varchar2,
+   p_level in number,
+   p_type in varchar2,
+   p_metric_name_1 in varchar2 default null,
+   p_metric_1 in number default null,
+   p_metric_name_2 in varchar2 default null,
+   p_metric_2 in number default null
    ) is 
    pragma autonomous_transaction;
 begin
-   if arcsql.log_level >= log_interface.log_level  then
+   if arcsql.log_level >= p_level  then
       insert into arcsql_log (
       log_text,
       log_type,
       log_key,
       log_tags,
       audsid,
-      username) values (
-      log_interface.log_text,
-      log_interface.log_type,
-      log_interface.log_key,
-      log_interface.log_tags,
+      username,
+      metric_name_1,
+      metric_1,
+      metric_name_2,
+      metric_2) values (
+      p_text,
+      p_type,
+      p_key,
+      p_tags,
       get_audsid,
-      user);
+      user,
+      p_metric_name_1,
+      p_metric_1,
+      p_metric_name_2,
+      p_metric_2);
       commit;
    end if;
 end;
 
-procedure log (log_text in varchar2, log_key in varchar2 default null, log_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
+procedure log (
+   log_text in varchar2, 
+   log_key in varchar2 default null, 
+   log_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
 begin
-   log_interface(log_text, log_key, log_tags, 0, 'log');
+   log_interface(
+      p_text=>log_text, 
+      p_key=>log_key, 
+      p_tags=>log_tags, 
+      p_level=>0, 
+      p_type=>'log',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
 end;
 
-procedure audit (audit_text in varchar2, audit_key in varchar2 default null, audit_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
+procedure audit (
+   audit_text in varchar2, 
+   audit_key in varchar2 default null, 
+   audit_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
 begin
-   log_interface(audit_text, audit_key, audit_tags, 0, 'audit');
+   log_interface(
+      p_text=>audit_text, 
+      p_key=>audit_key, 
+      p_tags=>audit_tags, 
+      p_level=>0, 
+      p_type=>'audit',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
 end;
 
-procedure err (error_text in varchar2, error_key in varchar2 default null, error_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
+procedure err (
+   error_text in varchar2, 
+   error_key in varchar2 default null, 
+   error_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
 begin
-   log_interface(error_text, error_key, error_tags, -1, 'error');
+   log_interface(
+      p_text=>error_text, 
+      p_key=>error_key, 
+      p_tags=>error_tags, 
+      p_level=>-1, 
+      p_type=>'error',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
 end;
 
-procedure debug (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
+procedure debug (
+   debug_text in varchar2, 
+   debug_key in varchar2 default null, 
+   debug_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
 begin
-   log_interface(debug_text, debug_key, debug_tags, 1, 'debug');
+   log_interface(
+      p_text=>debug_text, 
+      p_key=>debug_key, 
+      p_tags=>debug_tags, 
+      p_level=>1, 
+      p_type=>'debug',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
 end;
 
-procedure debug2 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
+procedure debug2 (
+   debug_text in varchar2, 
+   debug_key in varchar2 default null, 
+   debug_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
 begin
-   log_interface(debug_text, debug_key, debug_tags, 2, 'debug2');
+   log_interface(
+      p_text=>debug_text, 
+      p_key=>debug_key, 
+      p_tags=>debug_tags, 
+      p_level=>2, 
+      p_type=>'debug2',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
 end;
 
-procedure debug3 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
+procedure debug3 (
+   debug_text in varchar2, 
+   debug_key in varchar2 default null, 
+   debug_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
 begin
-   log_interface(debug_text, debug_key, debug_tags, 3, 'debug3');
+   log_interface(
+      p_text=>debug_text, 
+      p_key=>debug_key, 
+      p_tags=>debug_tags, 
+      p_level=>3, 
+      p_type=>'debug3',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
 end;
 
-procedure alert (alert_text in varchar2, alert_key in varchar2 default null, alert_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
+procedure alert (
+   alert_text in varchar2, 
+   alert_key in varchar2 default null, 
+   alert_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
 begin
-   log_interface(alert_text, alert_key, alert_tags, -1, 'alert');
+   log_interface(
+      p_text=>alert_text, 
+      p_key=>alert_key, 
+      p_tags=>alert_tags, 
+      p_level=>-1, 
+      p_type=>'alert',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
 end;
 
-procedure fail (fail_text in varchar2, fail_key in varchar2 default null, fail_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
+procedure fail (
+   fail_text in varchar2, 
+   fail_key in varchar2 default null, 
+   fail_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
 begin
-   log_interface(fail_text, fail_key, fail_tags, -1, 'fail');
+   log_interface(
+      p_text=>fail_text, 
+      p_key=>fail_key, 
+      p_tags=>fail_tags, 
+      p_level=>-1, 
+      p_type=>'fail',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
 end;
 
 /* UNIT TESTING */

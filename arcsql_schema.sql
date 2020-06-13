@@ -593,6 +593,10 @@ begin
       log_entry number default seq_arcsql_log_entry.nextval,
       log_text varchar2(1000),
       log_time date default sysdate,
+      metric_name_1 varchar2(120) default null,
+      metric_1 number default null,
+      metric_name_2 varchar2(120) default null,
+      metric_2 number default null,
       log_type varchar2(25) default ''log'' not null,
       log_key varchar2(120),
       log_tags varchar2(120),
@@ -602,6 +606,18 @@ begin
       create index arcsql_log_1 on arcsql_log(log_entry)', false);
       execute_sql('
       create index arcsql_log_2 on arcsql_log(log_time)', false);   
+   end if;
+   if not does_column_exist('arcsql_log', 'metric_name_1') then 
+      execute_sql('alter table arcsql_log add (metric_name_1 varchar2(120) default null)', false);
+   end if;
+   if not does_column_exist('arcsql_log', 'metric_1') then 
+      execute_sql('alter table arcsql_log add (metric_1 number default null)', false);
+   end if;
+   if not does_column_exist('arcsql_log', 'metric_name_2') then 
+      execute_sql('alter table arcsql_log add (metric_name_2 varchar2(120) default null)', false);
+   end if;
+   if not does_column_exist('arcsql_log', 'metric_2') then 
+      execute_sql('alter table arcsql_log add (metric_2 number default null)', false);
    end if;
 end;
 /
