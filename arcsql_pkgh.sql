@@ -16,9 +16,12 @@ create or replace package arcsql as
    Timer
    -----------------------------------------------------------------------------------
    */
-   g_timer_start date;
-   procedure start_time;
-   function get_time return number;
+
+   type table_type is table of date index by varchar2(120);
+
+   g_timer_start table_type;
+   procedure start_timer(p_key in varchar2);
+   function get_timer(p_key in varchar2) return number;
 
    /* 
    -----------------------------------------------------------------------------------

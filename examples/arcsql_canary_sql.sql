@@ -3,11 +3,11 @@ create or replace procedure arcsql_canary_sql as
    n number;
    t number;
 begin
-   arcsql.start_time;
+   arcsql.start_timer('arcsql_canary_1');
    select /* arcsql_canary_1 */ count(*) into n from gv$sql;
-   t := arcsql.get_time;
+   t := arcsql.get_timer('arcsql_canary_1');
    arcsql.log(
-      log_text=>'''arcsql_canary_1'' returned '||n||' rows in '||t||' seconds.',
+      log_text=>'arcsql_canary_1 returned '||n||' rows in '||t||' seconds.',
       metric_name_1=>'sql_canary_1_rowcount',
       metric_1=>n,
       metric_name_2=>'sql_canary_1_elap_sec',
