@@ -280,7 +280,40 @@ create or replace package arcsql as
       metric_1 in number default null,
       metric_name_2 in varchar2 default null,
       metric_2 in number default null);
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Contact Groups
+   -----------------------------------------------------------------------------------
+   */
    
+   g_contact_group arcsql_contact_group%rowtype;
+   procedure set_contact_group (p_group_name in varchar2);
+   procedure raise_contact_group_not_set;
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Keywords
+   -----------------------------------------------------------------------------------
+   */
+   
+   g_keyword arcsql_keyword%rowtype;
+   procedure set_keyword (p_keyword in varchar2);
+   procedure raise_keyword_not_set;
+   function does_keyword_exist (p_keyword in varchar2) return boolean;
+
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Alerts
+   -----------------------------------------------------------------------------------
+   */
+
+   procedure open_alert (
+      p_keyword in varchar2,
+      p_subject in varchar2,
+      p_body in varchar2);
+
    /* 
    -----------------------------------------------------------------------------------
    Unit Testing
@@ -346,6 +379,10 @@ create or replace package arcsql as
    procedure app_test_fail(p_message in varchar2 default null);
    procedure app_test_pass;
    procedure app_test_done;
+
+   function cron_match (
+      p_expression in varchar2,
+      p_datetime in date default sysdate) return boolean;
 
 end;
 /

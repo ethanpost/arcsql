@@ -584,7 +584,6 @@ begin
 end;
 /
 
-drop table arcsql_log;
 -- uninstall: drop table arcsql_log;
 begin 
    if not does_table_exist('arcsql_log') then 
@@ -698,4 +697,97 @@ begin
    end if;
 end;
 /
+
+-- uninstall: drop table contact_group cascade constraints purge;
+begin
+   if not does_table_exist('arcsql_contact_group') then 
+      execute_sql('
+      create table arcsql_contact_group (
+      group_name varchar2(120),
+      email_addresses varchar2(1000),
+      sms_addresses varchar2(1000),
+      is_default varchar2(1) default ''Y'' not null,
+      is_group_enabled varchar2(1) default ''Y'' not null,
+      is_group_on_hold varchar2(1) default ''N'' not null,
+      is_sms_disabled varchar2(1) default ''Y'' not null,
+      -- Amount of time the oldest message can sit in the queue before sending all messages in the queue.
+      max_queue_secs number default 0,
+      -- The amount of time the most recent message can sit in the queue without a new message arriving before sending all of the messages in the queue.
+      max_idle_secs number default 0,
+      -- The maximum # of messages that the queue can hold before sending all of the messaged in the queue.
+      max_count number default 0
+      )', false);
+      execute_sql('alter table arcsql_contact_group add constraint pk_arcsql_contact_group primary key (group_name)', false);
+   end if;
+end;
+/
+
+-- uninstall: drop table arcsql_keyword cascade constraints purge;
+begin
+   if not does_table_exist('arcsql_keyword') then 
+      execute_sql('
+      create table arcsql_keyword (
+      keyword varchar2(120),
+      sends_email varchar2(1) default ''Y'',
+      sends_sms varchar2(1) default ''N'',
+      -- The following columns take effect if arcsql.open_alert is called.
+      ends_email varchar2(1) default ''Y'',
+      sends_sms varchar2(1) default ''N'',
+      reminder_interval number default 0 not null,
+      reminder_backoff_multiple number default 1 not null,
+      reminder_count number default 0 not null,
+      reminder_keyword varchar2(120) default null,
+      abandon_interval number default 0 not null,
+      abandon_keyword varchar2(120) default null,
+      )', false);
+      execute_sql('alter table arcsql_keyword add constraint pk_arcsql_keyword primary key (keyword)', false);
+   end if;
+end;
+/
+
+-- uninstall: drop table arcsql_alert_level cascade constraints purge;
+begin
+   if not does_table_exist('arcsql_alert_level') then 
+      execute_sql('
+      create table arcsql_alert_level (
+      alert_level number,
+      alert_name varchar2(120),
+      enabled varchar2(60) default ''Y'',
+      -- Keywords reference the arsql_keyword table.
+      alert_keyword varchar2(120),
+      reminder_keyword varchar2(120),
+      reminder_interval number default 0 not null,
+      -- Reminder interval is multiplied by this value after each reminder to set the subsequent interval.
+      reminder_backoff_interval number default 1 not null,
+      abandon_keyword varchar2(120) default null,
+      abandon_interval number default 0 not null
+      )', false);
+      execute_sql('alter table arcsql_alert_level add constraint pk_arcsql_alert_level primary key (alert_level)', false);
+   end if;
+end;
+/
+
+exec create_sequence('seq_arcsql_message_id');
+
+-- uninstall: drop table arcsql_message_queue cascade constraints purge;
+drop table arcsql_message_queue cascade constraints purge;
+begin
+   if not does_table_exist('arcsql_message_queue') then 
+      execute_sql('
+      create table arcsql_message_queue (
+      message_id number default seq_arcsql_message_id.nextval,
+      message_keyword varchar2(120) not null,
+      message_subject varchar2(120) not null,
+      message_body varchar2(2000) default null,
+      inserted date default sysdate,
+      -- Optional field which sends a reminder or something in the future.
+      send_datetime date default null,
+      sent_datetime date default null
+      )', false);
+      execute_sql('alter table arcsql_message_queue add constraint pk_arcsql_message_queue primary key (message_id)', false);
+   end if;
+end;
+/
+
+
 

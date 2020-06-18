@@ -29,6 +29,11 @@ begin
    return total_secs;
 end;
 
+procedure raise_invalid_cron_expression (p_expression in varchar2) is 
+begin 
+   null;
+end;
+
 /* 
 -----------------------------------------------------------------------------------
 Timer
@@ -111,6 +116,7 @@ exception
 end;
 
 function str_is_number_y_or_n (text varchar2) return varchar2 is
+   -- Return true if the provided string evalutes to a number.
    x number;
 begin
    x := to_number(text);
@@ -121,6 +127,7 @@ exception
 end;
 
 function str_complexity_check
+   -- Return true if the complexity of 'text' meets the provided requirements.
    (text   varchar2,
     chars      integer := null,
     letter     integer := null,
@@ -205,6 +212,8 @@ function get_token (
    p_list  varchar2,
    p_index number,
    p_delim varchar2 := ',') return varchar2 is 
+   -- Return a single member of a list in the form of 'a,b,c'.
+   -- Largely taken from https://glosoli.blogspot.com/2006/07/oracle-plsql-function-to-split-strings.html.
    start_pos number;
    end_pos   number;
 begin
@@ -1732,7 +1741,76 @@ begin
       p_metric_2=>metric_2);
 end;
 
-/* UNIT TESTING */
+
+/* 
+-----------------------------------------------------------------------------------
+Contact Groups
+-----------------------------------------------------------------------------------
+*/
+
+procedure set_contact_group (p_group_name in varchar2) is 
+begin 
+   select * into g_contact_group from arcsql_contact_group
+    where group_name=p_group_name;
+end;
+
+procedure raise_contact_group_not_set is 
+begin 
+   if g_contact_group.group_name is null then  
+      raise_application_error(-20001, 'Contact group is not set.');
+   end if;
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Keywords
+-----------------------------------------------------------------------------------
+*/
+
+procedure set_keyword (p_keyword in varchar2) is 
+begin 
+   select * into g_keyword from arcsql_keyword
+    where keyword=p_keyword;
+end;
+
+procedure raise_keyword_not_set is 
+begin 
+   if g_keyword.keyword is null then  
+      raise_application_error(-20001, 'Keyword is not set.');
+   end if;
+end;
+
+function does_keyword_exist (p_keyword in varchar2) return boolean is 
+   n number;
+begin 
+   select count(*) into n from arcsql_keyword 
+    where keyword=lower(p_keyword);
+   if n = 0 then 
+      return false;
+   else 
+      return true;
+   end if;
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Alerts
+-----------------------------------------------------------------------------------
+*/
+   
+procedure open_alert (
+   p_keyword in varchar2,
+   p_subject in varchar2,
+   p_body in varchar2) is 
+begin 
+   null;
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Unit Testing
+-----------------------------------------------------------------------------------
+*/
 
 procedure pass_test is 
 begin 
@@ -2224,5 +2302,173 @@ begin
    commit;
 end;
 
+function cron_match (
+   p_expression in varchar2,
+   p_datetime in date default sysdate) return boolean is 
+   v_expression varchar2(120) := upper(p_expression);
+   v_min varchar2(120);
+   v_hr varchar2(120);
+   v_dom varchar2(120);
+   v_mth varchar2(120);
+   v_dow varchar2(120);
+   t_min number;
+   t_hr number;
+   t_dom number;
+   t_mth number;
+   t_dow number;
+
+   function is_cron_multiple_true (v in varchar2, t in number) return boolean is 
+   begin 
+      if mod(t, to_number(replace(v, '/', ''))) = 0 then 
+         return true;
+      end if;
+      return false;
+   end;
+
+   function is_cron_in_range_true (v in varchar2, t in number) return boolean is 
+      left_side number;
+      right_side number;
+   begin 
+      left_side := get_token(p_list=>v, p_index=>1, p_delim=>'-');
+      right_side := get_token(p_list=>v, p_index=>2, p_delim=>'-');
+      -- Low value to high value.
+      if left_side < right_side then 
+         if t >= left_side and t <= right_side then 
+            return true;
+         end if;
+      else 
+         -- High value to lower value can be used for hours like 23-2 (11PM to 2AM).
+         -- Other examples: minutes 55-10, day of month 29-3, month of year 11-1.
+         if t >= left_side or t <= right_side then 
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+   function is_cron_in_list_true (v in varchar2, t in number) return boolean is 
+   begin 
+      for x in (select trim(regexp_substr(v, '[^,]+', 1, level)) l
+                  from dual
+                       connect by 
+                       level <= regexp_count(v, ',')+1) 
+      loop
+         if to_number(x.l) = t then 
+            return true;
+         end if;
+      end loop;
+      return false;
+   end;
+
+   function is_cron_part_true (v in varchar2, t in number) return boolean is 
+   begin 
+      if trim(v) = 'X' then 
+         return true;
+      end if;
+      if instr(v, '/') > 0 then 
+         if is_cron_multiple_true (v, t) then
+            return true;
+         end if;
+      elsif instr(v, '-') > 0 then 
+         if is_cron_in_range_true (v, t) then 
+            return true;
+         end if;
+      elsif instr(v, ',') > 0 then 
+         if is_cron_in_list_true (v, t) then 
+            return true;
+         end if;
+      else 
+         if to_number(v) = t then 
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+   function is_cron_true (v in varchar2, t in number) return boolean is 
+   begin 
+      if trim(v) = 'X' then 
+         return true;
+      end if;
+      for x in (select trim(regexp_substr(v, '[^,]+', 1, level)) l
+                  from dual
+                       connect by 
+                       level <= regexp_count(v, ',')+1) 
+      loop
+         if not is_cron_part_true(x.l, t) then 
+            return false;
+         end if;
+      end loop;
+      return true;
+   end;
+
+   function convert_dow (v in varchar2) return varchar2 is 
+       r varchar2(120);
+   begin 
+       r := replace(v, 'SUN', 0);
+       r := replace(r, 'MON', 1);
+       r := replace(r, 'TUE', 2);
+       r := replace(r, 'WED', 3);
+       r := replace(r, 'THU', 4);
+       r := replace(r, 'FRI', 5);
+       r := replace(r, 'SAT', 6);
+       return r;
+   end;
+
+   function convert_mth (v in varchar2) return varchar2 is 
+      r varchar2(120);
+   begin 
+      r := replace(v, 'JAN', 1);
+      r := replace(r, 'FEB', 2);
+      r := replace(r, 'MAR', 3);
+      r := replace(r, 'APR', 4);
+      r := replace(r, 'MAY', 5);
+      r := replace(r, 'JUN', 6);
+      r := replace(r, 'JUL', 7);
+      r := replace(r, 'AUG', 8);
+      r := replace(r, 'SEP', 9);
+      r := replace(r, 'OCT', 10);
+      r := replace(r, 'NOV', 11);
+      r := replace(r, 'DEC', 12);
+      return r;
+   end;
+
+begin 
+   -- Replace * with X.
+   v_expression := replace(v_expression, '*', 'X');
+   raise_invalid_cron_expression(v_expression);
+
+   v_min := get_token(p_list=>v_expression, p_index=>1, p_delim=>' ');
+   v_hr := get_token(p_list=>v_expression, p_index=>2, p_delim=>' ');
+   v_dom := get_token(p_list=>v_expression, p_index=>3, p_delim=>' ');
+   v_mth := convert_mth(get_token(p_list=>v_expression, p_index=>4, p_delim=>' '));
+   v_dow := convert_dow(get_token(p_list=>v_expression, p_index=>5, p_delim=>' '));
+
+   t_min := to_number(to_char(p_datetime, 'MI'));
+   t_hr := to_number(to_char(p_datetime, 'HH24'));
+   t_dom := to_number(to_char(p_datetime, 'DD'));
+   t_mth := to_number(to_char(p_datetime, 'MM'));
+   t_dow := to_number(to_char(p_datetime, 'D'));
+
+   if not is_cron_true(v_min, t_min) then 
+      return false;
+   end if;
+   if not is_cron_true(v_hr, t_hr) then 
+      return false;
+   end if;
+   if not is_cron_true(v_dom, t_dom) then 
+      return false;
+   end if;
+   if not is_cron_true(v_mth, t_mth) then 
+      return false;
+   end if;
+   if not is_cron_true(v_dow, t_dow) then 
+      return false;
+   end if;
+   return true;
+end;
+
 end;
 /
+
+
