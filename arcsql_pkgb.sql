@@ -1572,7 +1572,7 @@ function does_log_type_exist (p_log_type in varchar2) return boolean is
    n number;
 begin 
    select count(*) into n from arcsql_log_type 
-    where log_type=lower(p_log_type);
+    where lower(log_type)=lower(p_log_type);
    if n = 0 then 
       return false;
    else 
@@ -1593,6 +1593,11 @@ procedure log_interface (
    ) is 
    pragma autonomous_transaction;
 begin
+   if not does_log_type_exist(p_type) then 
+      insert into arcsql_log_type (
+         log_type) values (
+         lower(p_type));
+   end if;
    if arcsql.log_level >= p_level  then
       insert into arcsql_log (
       log_text,
@@ -1606,7 +1611,7 @@ begin
       metric_name_2,
       metric_2) values (
       p_text,
-      p_type,
+      lower(p_type),
       p_key,
       p_tags,
       get_audsid,
@@ -2524,6 +2529,17 @@ begin
    end if;
 end;
 
+function does_alert_level_exist(p_level in number) return boolean is 
+   n number;
+begin 
+   select count(*) into n from arcsql_alert_level where alert_level=p_level;
+   if n > 0 then 
+      return true;
+   else 
+      return false;
+   end if;
+end;
+
 procedure set_alert_level (p_level in number) is 
    n number;
 begin 
@@ -2540,8 +2556,20 @@ begin
    else 
       -- If no alert types are enabled we still will need some values here.
       g_alert_level.alert_level := 0;
-      g_alert_level.alert_type := 'Disabled';
    end if;
+end;
+
+function get_default_alert_level return number is 
+   cursor default_alert_levels is 
+   select * from arcsql_alert_level 
+    where is_truthy_y(is_default)='y'
+    order 
+       by alert_level desc;
+begin 
+   for alert_level in default_alert_levels loop 
+      return alert_level.alert_level;
+   end loop;
+   return 3;
 end;
 
 procedure set_alert(p_alert in varchar2) is 
@@ -2555,11 +2583,15 @@ procedure open_alert (
    -- Supplemental text to add to the alert.
    p_text in varchar2 default null,
    -- Supports levels 1-5 (critical, high, moderate, low, informational).
-   p_level in number default 0,
+   p_level in number default null,
    p_contact_groups in varchar2 default null) is 
+   v_level number := p_level;
 begin
    if not is_alert_open(p_alert) then 
-      set_alert_level(p_level);
+      if v_level is null then 
+         v_level := get_default_alert_level;
+      end if;
+      set_alert_level(v_level);
       -- If all alert types are disabled skip any furthur action.
       if g_alert_level.alert_level > 0 then
          insert into arcsql_alert (

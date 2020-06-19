@@ -578,6 +578,8 @@ exec drop_sequence('SEQ_VERSION_UPDATE_ID');
 -- uninstall: drop table arcsql_log_type cascade constraints purge;
 drop table arcsql_log_type;
 begin
+   -- log_type is forced to lower case.
+   -- New values added automatically if log_interface is called and type is not found.
    if not does_table_exist('arcsql_log_type') then 
       execute_sql('
       create table arcsql_log_type (
@@ -746,6 +748,8 @@ begin
       alert_type varchar2(120),
       -- Truthy values including cron expressions are allowed here.
       enabled varchar2(60) default ''Y'',
+      -- Can be a truthy value including cron expression.
+      is_default varchar2(120) default null,
       alert_log_type varchar2(120),
       reminder_log_type varchar2(120),
       -- In minutes.
