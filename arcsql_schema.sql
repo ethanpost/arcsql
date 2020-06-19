@@ -25,7 +25,6 @@ begin
 end;
 /
 
- 
 -- Some version of this probably comes from Steve Adams of Ixora fame.
 -- as well as plenty of other things here.
 
@@ -576,6 +575,21 @@ end;
 exec drop_table('VERSION_UPDATE');
 exec drop_sequence('SEQ_VERSION_UPDATE_ID');
 
+-- uninstall: drop table arcsql_log_type cascade constraints purge;
+drop table arcsql_log_type;
+begin
+   if not does_table_exist('arcsql_log_type') then 
+      execute_sql('
+      create table arcsql_log_type (
+      log_type varchar2(120),
+      sends_email varchar2(1) default ''Y'',
+      sends_sms varchar2(1) default ''N''
+      )', false);
+      execute_sql('alter table arcsql_log_type add constraint pk_arcsql_log_type primary key (log_type)', false);
+   end if;
+end;
+/
+
 -- uninstall: drop sequence seq_arcsql_log_entry;
 begin
    if not does_sequence_exist('seq_arcsql_log_entry') then 
@@ -643,24 +657,24 @@ begin
       retry_count number default 0 not null,
       -- The interval to wait before allowing a retry, if null then test_interval is used.
       retry_interval number default 0 not null,
-      -- Keyword to log when a retry is attempted.
-      retry_keyword varchar2(120) default null,
-      -- Keyword to log when state changes to failed.
-      failed_keyword varchar2(120),
+      -- Log type to log when a retry is attempted.
+      retry_log_type varchar2(120) default null,
+      -- Log type to log when state changes to failed.
+      failed_log_type varchar2(120),
       -- Interval to wait between reminders. If null reminders are not sent.
       reminder_interval number default null,
-      -- Keyword to log when a reminder is sent.
-      reminder_keyword varchar2(120),
+      -- Log type to log when a reminder is sent.
+      reminder_log_type varchar2(120),
       -- Dynamically change the interval each time the reminder runs by some # or %.
       reminder_backoff number default 1 not null,
       -- Interval to wait before test is abandoned (test is still run but no reporting takes place if it continues to fail.)
       abandon_interval number default null,
-      -- Keyword to log when abandon occurs.
-      abandon_keyword varchar2(120) default null,
+      -- Log type to log when abandon occurs.
+      abandon_log_type varchar2(120) default null,
       -- If Y test resets automatically to passing on abandon.
       abandon_reset varchar2(1) default ''N'',
-      -- Keyword to log when test changes from fail to pass.
-      pass_keyword varchar2(120))', false);
+      -- Log type to log when test changes from fail to pass.
+      pass_log_type varchar2(120))', false);
       execute_sql('create index test_profile_1 on app_test_profile (profile_name, env_type)', false);
     end if;
 end;
@@ -722,72 +736,51 @@ begin
 end;
 /
 
--- uninstall: drop table arcsql_keyword cascade constraints purge;
-begin
-   if not does_table_exist('arcsql_keyword') then 
-      execute_sql('
-      create table arcsql_keyword (
-      keyword varchar2(120),
-      sends_email varchar2(1) default ''Y'',
-      sends_sms varchar2(1) default ''N'',
-      -- The following columns take effect if arcsql.open_alert is called.
-      ends_email varchar2(1) default ''Y'',
-      sends_sms varchar2(1) default ''N'',
-      reminder_interval number default 0 not null,
-      reminder_backoff_multiple number default 1 not null,
-      reminder_count number default 0 not null,
-      reminder_keyword varchar2(120) default null,
-      abandon_interval number default 0 not null,
-      abandon_keyword varchar2(120) default null,
-      )', false);
-      execute_sql('alter table arcsql_keyword add constraint pk_arcsql_keyword primary key (keyword)', false);
-   end if;
-end;
-/
-
 -- uninstall: drop table arcsql_alert_level cascade constraints purge;
+drop table arcsql_alert_level;
 begin
    if not does_table_exist('arcsql_alert_level') then 
       execute_sql('
       create table arcsql_alert_level (
       alert_level number,
-      alert_name varchar2(120),
+      alert_type varchar2(120),
+      -- Truthy values including cron expressions are allowed here.
       enabled varchar2(60) default ''Y'',
-      -- Keywords reference the arsql_keyword table.
-      alert_keyword varchar2(120),
-      reminder_keyword varchar2(120),
+      alert_log_type varchar2(120),
+      reminder_log_type varchar2(120),
+      -- In minutes.
       reminder_interval number default 0 not null,
+      reminder_count number default 0 not null,
       -- Reminder interval is multiplied by this value after each reminder to set the subsequent interval.
       reminder_backoff_interval number default 1 not null,
-      abandon_keyword varchar2(120) default null,
-      abandon_interval number default 0 not null
+      abandon_log_type varchar2(120) default null,
+      abandon_interval number default 0 not null,
+      -- Automatically close the alert when interval (min) elapses.
+      close_log_type varchar2(120) default null,
+      close_interval number default 0 not null
       )', false);
       execute_sql('alter table arcsql_alert_level add constraint pk_arcsql_alert_level primary key (alert_level)', false);
    end if;
 end;
 /
 
-exec create_sequence('seq_arcsql_message_id');
-
--- uninstall: drop table arcsql_message_queue cascade constraints purge;
-drop table arcsql_message_queue cascade constraints purge;
+-- uninstall: drop table arcsql_alert cascade constraints purge;
 begin
-   if not does_table_exist('arcsql_message_queue') then 
+   if not does_table_exist('arcsql_alert') then 
       execute_sql('
-      create table arcsql_message_queue (
-      message_id number default seq_arcsql_message_id.nextval,
-      message_keyword varchar2(120) not null,
-      message_subject varchar2(120) not null,
-      message_body varchar2(2000) default null,
-      inserted date default sysdate,
-      -- Optional field which sends a reminder or something in the future.
-      send_datetime date default null,
-      sent_datetime date default null
+      create table arcsql_alert (
+      alert_id varchar2(120),
+      alert_text varchar2(120),
+      alert_level number not null,
+      opened date default sysdate,
+      closed date default null,
+      abandoned date default null,
+      contact_groups varchar2(120),
+      reminder_count number default 0,
+      reminder_interval number default 0
       )', false);
-      execute_sql('alter table arcsql_message_queue add constraint pk_arcsql_message_queue primary key (message_id)', false);
+      execute_sql('alter table arcsql_alert add constraint pk_arcsql_alert primary key (alert_id)', false);
    end if;
 end;
 /
-
-
 

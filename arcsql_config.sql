@@ -26,67 +26,66 @@ begin
 end;
 /
 
-
 begin 
-   if not arcsql.does_keyword_exist('alert') then 
-      insert into arcsql_keyword (keyword, sends_email) values ('alert', 'Y');
+   if not arcsql.does_log_type_exist('alert') then 
+      insert into arcsql_log_type (log_type, sends_email) values ('alert', 'Y');
    end if;
 end;
 /
 
 begin 
-   if not arcsql.does_keyword_exist('fail') then 
-      insert into arcsql_keyword (keyword, sends_email) values ('fail', 'Y');
+   if not arcsql.does_log_type_exist('fail') then 
+      insert into arcsql_log_type (log_type, sends_email) values ('fail', 'Y');
    end if;
 end;
 /
 
 begin 
-   if not arcsql.does_keyword_exist('email') then 
-      insert into arcsql_keyword (keyword, sends_email) values ('email', 'Y');
+   if not arcsql.does_log_type_exist('email') then 
+      insert into arcsql_log_type (log_type, sends_email) values ('email', 'Y');
    end if;
 end;
 /
 
 begin 
-   if not arcsql.does_keyword_exist('sms') then 
-      insert into arcsql_keyword (keyword, sends_email, sends_sms) values ('sms', 'Y', 'Y');
+   if not arcsql.does_log_type_exist('sms') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('sms', 'Y', 'Y');
    end if;
 end;
 /
 
 begin 
-   if not arcsql.does_keyword_exist('critical') then 
-      insert into arcsql_keyword (keyword, sends_email, sends_sms) values ('critical', 'Y', 'Y');
+   if not arcsql.does_log_type_exist('critical') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('critical', 'Y', 'Y');
    end if;
 end;
 /
 
 begin 
-   if not arcsql.does_keyword_exist('warning') then 
-      insert into arcsql_keyword (keyword, sends_email, sends_sms) values ('warning', 'Y', 'N');
+   if not arcsql.does_log_type_exist('warning') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('warning', 'Y', 'N');
    end if;
 end;
 /
 
 begin 
-   if not arcsql.does_keyword_exist('info') then 
-      insert into arcsql_keyword (keyword, sends_email, sends_sms) values ('info', 'Y', 'N');
+   if not arcsql.does_log_type_exist('info') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('info', 'Y', 'N');
    end if;
 end;
 /
 
 begin 
-   if not arcsql.does_keyword_exist('notice') then 
-      insert into arcsql_keyword (keyword, sends_email, sends_sms) values ('notice', 'Y', 'N');
+   if not arcsql.does_log_type_exist('notice') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('notice', 'Y', 'N');
    end if;
 end;
 /
 
 
 begin 
-   if not arcsql.does_keyword_exist('notify') then 
-      insert into arcsql_keyword (keyword, sends_email, sends_sms) values ('notify', 'Y', 'N');
+   if not arcsql.does_log_type_exist('notify') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('notify', 'Y', 'N');
    end if;
 end;
 /

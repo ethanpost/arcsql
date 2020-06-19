@@ -315,6 +315,27 @@ Utilities
 -----------------------------------------------------------------------------------
 */
 
+function is_truthy (p_val in varchar2) return boolean is 
+begin
+   if lower(p_val) in ('y','yes', '1', 'true') then
+      return true;
+   elsif instr(p_val, ' ') > 0 then 
+      if cron_match(p_val) then 
+         return true;
+      end if;
+   end if;
+   return false;
+end;
+
+function is_truthy_y (p_val in varchar2) return varchar2 is 
+begin 
+   if is_truthy(p_val) then 
+      return 'y';
+   else 
+      return 'n';
+   end if;
+end;
+
 procedure backup_table (sourceTable varchar2, newTable varchar2, dropTable boolean := false) is
 begin
    if dropTable then
@@ -1534,6 +1555,31 @@ Logging
 -----------------------------------------------------------------------------------
 */
 
+procedure set_log_type (p_log_type in varchar2) is 
+begin 
+   select * into g_log_type from arcsql_log_type
+    where log_type=p_log_type;
+end;
+
+procedure raise_log_type_not_set is 
+begin 
+   if g_log_type.log_type is null then  
+      raise_application_error(-20001, 'Log type is not set.');
+   end if;
+end;
+
+function does_log_type_exist (p_log_type in varchar2) return boolean is 
+   n number;
+begin 
+   select count(*) into n from arcsql_log_type 
+    where log_type=lower(p_log_type);
+   if n = 0 then 
+      return false;
+   else 
+      return true;
+   end if;
+end;
+
 procedure log_interface (
    p_text in varchar2, 
    p_key in varchar2, 
@@ -1741,7 +1787,6 @@ begin
       p_metric_2=>metric_2);
 end;
 
-
 /* 
 -----------------------------------------------------------------------------------
 Contact Groups
@@ -1763,43 +1808,12 @@ end;
 
 /* 
 -----------------------------------------------------------------------------------
-Keywords
------------------------------------------------------------------------------------
-*/
-
-procedure set_keyword (p_keyword in varchar2) is 
-begin 
-   select * into g_keyword from arcsql_keyword
-    where keyword=p_keyword;
-end;
-
-procedure raise_keyword_not_set is 
-begin 
-   if g_keyword.keyword is null then  
-      raise_application_error(-20001, 'Keyword is not set.');
-   end if;
-end;
-
-function does_keyword_exist (p_keyword in varchar2) return boolean is 
-   n number;
-begin 
-   select count(*) into n from arcsql_keyword 
-    where keyword=lower(p_keyword);
-   if n = 0 then 
-      return false;
-   else 
-      return true;
-   end if;
-end;
-
-/* 
------------------------------------------------------------------------------------
 Alerts
 -----------------------------------------------------------------------------------
 */
    
 procedure open_alert (
-   p_keyword in varchar2,
+   p_log_type in varchar2,
    p_subject in varchar2,
    p_body in varchar2) is 
 begin 
@@ -1873,16 +1887,16 @@ procedure add_app_test_profile (
    p_recheck_interval in number default 0,
    p_retry_count in number default 0,
    p_retry_interval in number default 0,
-   p_retry_keyword in varchar2 default 'retry',
-   p_failed_keyword in varchar2 default 'warning',
+   p_retry_log_type in varchar2 default 'retry',
+   p_failed_log_type in varchar2 default 'warning',
    p_reminder_interval in number default 60,
-   p_reminder_keyword in varchar2 default 'warning',
+   p_reminder_log_type in varchar2 default 'warning',
    -- Interval is multiplied by this # each time a reminder is sent to set the next interval.
    p_reminder_backoff in number default 1,
    p_abandon_interval in varchar2 default null,
-   p_abandon_keyword in varchar2 default 'abandon',
+   p_abandon_log_type in varchar2 default 'abandon',
    p_abandon_reset in varchar2 default 'N',
-   p_pass_keyword in varchar2 default 'passed'
+   p_pass_log_type in varchar2 default 'passed'
    ) is
 begin
    if not does_app_test_profile_exist(p_profile_name, p_env_type) then
@@ -1894,15 +1908,15 @@ begin
       g_app_test_profile.recheck_interval := p_recheck_interval;
       g_app_test_profile.retry_count := p_retry_count;
       g_app_test_profile.retry_interval := p_retry_interval;
-      g_app_test_profile.retry_keyword := p_retry_keyword;
-      g_app_test_profile.failed_keyword := p_failed_keyword;
+      g_app_test_profile.retry_log_type := p_retry_log_type;
+      g_app_test_profile.failed_log_type := p_failed_log_type;
       g_app_test_profile.reminder_interval := p_reminder_interval;
-      g_app_test_profile.reminder_keyword := p_reminder_keyword;
+      g_app_test_profile.reminder_log_type := p_reminder_log_type;
       g_app_test_profile.reminder_backoff := p_reminder_backoff;
       g_app_test_profile.abandon_interval := p_abandon_interval;
-      g_app_test_profile.abandon_keyword := p_abandon_keyword;
+      g_app_test_profile.abandon_log_type := p_abandon_log_type;
       g_app_test_profile.abandon_reset := p_abandon_reset;
-      g_app_test_profile.pass_keyword := p_pass_keyword;
+      g_app_test_profile.pass_log_type := p_pass_log_type;
       save_app_test_profile;
    end if;
 end;
@@ -2074,9 +2088,9 @@ begin
       null;
    end if;
    if g_app_test.test_status in ('RETRY') and retry_interval then 
-      if not g_app_test_profile.retry_keyword is null then
+      if not g_app_test_profile.retry_log_type is null then
          arcsql.log(
-            log_text=>'['||g_app_test_profile.retry_keyword||'] Application test '''||g_app_test.test_name||''' is being retried.',
+            log_text=>'['||g_app_test_profile.retry_log_type||'] Application test '''||g_app_test.test_name||''' is being retried.',
             log_key=>'app_test');
       end if;
       time_to_test := true;
@@ -2127,9 +2141,9 @@ procedure app_test_check is
    begin 
       g_app_test.abandon_time := sysdate;
       g_app_test.total_abandons := g_app_test.total_abandons + 1;
-      if not g_app_test_profile.abandon_keyword is null then 
+      if not g_app_test_profile.abandon_log_type is null then 
          arcsql.log(
-            log_text=>'['||g_app_test_profile.abandon_keyword||'] Application test '''||g_app_test.test_name||''' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
+            log_text=>'['||g_app_test_profile.abandon_log_type||'] Application test '''||g_app_test.test_name||''' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
             log_key=>'app_test');
       end if;
       -- If reset is Y the test changes back to PASS and will likely FAIL on the next check and cycle through the whole process again.
@@ -2163,9 +2177,9 @@ procedure app_test_check is
       g_app_test.last_reminder_time := sysdate;
       g_app_test.reminder_count := g_app_test.reminder_count + 1;
       g_app_test.total_reminders := g_app_test.total_reminders + 1;
-      if not g_app_test_profile.reminder_keyword is null then
+      if not g_app_test_profile.reminder_log_type is null then
          arcsql.log(
-            log_text=>'['||g_app_test_profile.reminder_keyword||'] A reminder that application test '''||g_app_test.test_name||''' is still failing.',
+            log_text=>'['||g_app_test_profile.reminder_log_type||'] A reminder that application test '''||g_app_test.test_name||''' is still failing.',
             log_key=>'app_test');
       end if;
    end;
@@ -2202,9 +2216,9 @@ procedure app_test_fail (p_message in varchar2 default null) is
       g_app_test.failed_time := g_app_test.test_end_time;
       g_app_test.last_reminder_time := g_app_test.test_end_time;
       g_app_test.total_failures := g_app_test.total_failures + 1;
-      if not g_app_test_profile.failed_keyword is null then 
+      if not g_app_test_profile.failed_log_type is null then 
          arcsql.log(
-            log_text=>'['||g_app_test_profile.failed_keyword||'] Application test '''||g_app_test.test_name||''' has failed.',
+            log_text=>'['||g_app_test_profile.failed_log_type||'] Application test '''||g_app_test.test_name||''' has failed.',
             log_key=>'app_test');
       end if;
    end;
@@ -2259,9 +2273,9 @@ procedure app_test_pass is
       g_app_test.reminder_count := 0;
       g_app_test.reminder_interval := g_app_test_profile.reminder_interval;
       g_app_test.retry_count := 0;
-      if not g_app_test_profile.pass_keyword is null then
+      if not g_app_test_profile.pass_log_type is null then
          arcsql.log (
-            log_text=>'['||g_app_test_profile.pass_keyword||'] Application test '''||g_app_test.test_name||''' is now passing.',
+            log_text=>'['||g_app_test_profile.pass_log_type||'] Application test '''||g_app_test.test_name||''' is now passing.',
             log_key=>'app_test');
       end if;
    end;
@@ -2466,6 +2480,180 @@ begin
       return false;
    end if;
    return true;
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Messaging
+-----------------------------------------------------------------------------------
+*/
+
+-- The messaging interface queue leverages the logging interface.
+procedure send_message (
+   p_text in varchar2,  
+   -- ToDo: Need to set up a default log_type.
+   p_log_type in varchar2 default 'email',
+   -- ToDo: key is confusing, it sounds unique but it really isn't. Need to come up with something clearer.
+   -- p_key in varchar2 default 'arcsql',
+   p_tags in varchar2 default null) is 
+begin 
+   log_interface(
+      p_type=>p_log_type,
+      p_text=>p_text, 
+      p_key=>'message',
+      p_tags=>p_tags, 
+      p_level=>0);
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Alerting
+-----------------------------------------------------------------------------------
+*/
+
+function is_alert_open (p_alert in varchar2) return boolean is 
+   n number;
+begin 
+   select count(*) into n from arcsql_alert 
+    where lower(alert_id)=lower(p_alert) 
+      and closed is null;
+   if n > 0 then 
+      return true;
+   else 
+      return false;
+   end if;
+end;
+
+procedure set_alert_level (p_level in number) is 
+   n number;
+begin 
+   -- Get the max level alert type which is enabled.
+   g_alert_level := null;
+   select max(alert_level) into n 
+     from arcsql_alert_level 
+    where alert_level <= p_level 
+      and is_truthy_y(enabled) = 'y';
+   if nvl(n, 0) > 0 then 
+      select * into g_alert_level
+        from arcsql_alert_level 
+       where alert_level=n;
+   else 
+      -- If no alert types are enabled we still will need some values here.
+      g_alert_level.alert_level := 0;
+      g_alert_level.alert_type := 'Disabled';
+   end if;
+end;
+
+procedure set_alert(p_alert in varchar2) is 
+begin 
+   select * into g_alert from arcsql_alert where lower(alert_id)=lower(p_alert);
+end;
+
+procedure open_alert (
+   -- Alert text. Is used to identify a particular alert.
+   p_alert in varchar2,
+   -- Supplemental text to add to the alert.
+   p_text in varchar2 default null,
+   -- Supports levels 1-5 (critical, high, moderate, low, informational).
+   p_level in number default 0,
+   p_contact_groups in varchar2 default null) is 
+begin
+   if not is_alert_open(p_alert) then 
+      set_alert_level(p_level);
+      -- If all alert types are disabled skip any furthur action.
+      if g_alert_level.alert_level > 0 then
+         insert into arcsql_alert (
+            alert_id,
+            alert_text,
+            alert_level,
+            opened,
+            closed,
+            abandoned,
+            contact_groups,
+            reminder_count,
+            reminder_interval
+            ) values (
+            p_alert,
+            p_text,
+            g_alert_level.alert_level,
+            sysdate,
+            null,
+            null,
+            p_contact_groups,
+            0,
+            g_alert_level.reminder_interval
+            );
+         send_message (
+            p_text=>p_alert||' '||'[New Alert-'||g_alert_level.alert_level||']',
+            p_log_type=>g_alert_level.alert_log_type);
+      end if;
+   end if;
+end;
+
+procedure close_alert (p_alert in varchar2) is 
+begin 
+   set_alert(p_alert);
+   set_alert_level(g_alert.alert_level);
+   if not g_alert_level.close_log_type is null then 
+      send_message('FOO');
+   end if;
+   update arcsql_alert set closed=sysdate 
+    where lower(alert_id)=lower(p_alert);
+   if not g_alert_level.close_log_type is null and g_alert_level.alert_level > 0 then
+      send_message (
+         p_text=>p_alert||' [Closing Alert-'||g_alert_level.alert_level||']',
+         p_log_type=>g_alert_level.close_log_type);
+   end if;
+end;
+
+procedure abandon_alert (p_alert in varchar2) is 
+begin 
+   set_alert(p_alert);
+   set_alert_level(g_alert.alert_level);
+   if not g_alert_level.abandon_log_type is null then 
+      send_message('FOO');
+   end if;
+   update arcsql_alert set abandoned=sysdate 
+    where lower(alert_id)=lower(p_alert);
+   if not g_alert_level.abandon_log_type is null and g_alert_level.alert_level > 0 then
+      send_message (
+         p_text=>p_alert||' [Abandoning Alert-'||g_alert_level.alert_level||']',
+         p_log_type=>g_alert_level.abandon_log_type);
+   end if;
+end;
+
+procedure remind_alert (p_alert in varchar2) is 
+begin 
+   set_alert(p_alert);
+   set_alert_level(g_alert.alert_level);
+   update arcsql_alert 
+      set reminder_interval=reminder_interval*g_alert_level.reminder_backoff_interval,
+          reminder_count=reminder_count+1
+    where lower(alert_id)=lower(p_alert);
+   send_message (
+      p_text=>p_alert||' [Reminder Alert-'||g_alert_level.alert_level||']',
+      p_log_type=>nvl(g_alert_level.reminder_log_type, g_alert_level.alert_log_type));
+end;
+
+procedure check_alerts is 
+   cursor alerts is 
+   select * from arcsql_alert 
+    where closed is null and abandoned is null;
+begin 
+   for alert in alerts loop 
+      set_alert_level(alert.alert_level);
+      if g_alert_level.close_interval > 0 and alert.opened+(g_alert_level.close_interval/1440) < sysdate then 
+         close_alert(alert.alert_id);
+      end if;
+      if g_alert_level.abandon_interval > 0 and alert.opened+(g_alert_level.abandon_interval/1440) < sysdate then 
+         abandon_alert(alert.alert_id);
+      end if;
+      if g_alert_level.reminder_interval > 0 and 
+         alert.opened+(g_alert_level.reminder_interval/1440) < sysdate and
+         alert.reminder_count < g_alert_level.reminder_count then 
+         remind_alert(alert.alert_id);
+      end if;
+   end loop;
 end;
 
 end;

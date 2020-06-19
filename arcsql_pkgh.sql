@@ -89,6 +89,8 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
+   function is_truthy (p_val in varchar2) return boolean;
+   function is_truthy_y (p_val in varchar2) return varchar2;
    -- Create a copy of a table and possibly drop the existing copy if it already exists.
    procedure backup_table (sourceTable varchar2, newTable varchar2, dropTable boolean := false);
    -- Connect to an external file as a local table.
@@ -197,6 +199,14 @@ create or replace package arcsql as
 
    log_level number default 1;
 
+   g_log_type arcsql_log_type%rowtype;
+
+   procedure set_log_type (p_log_type in varchar2);
+
+   procedure raise_log_type_not_set;
+
+   function does_log_type_exist (p_log_type in varchar2) return boolean;
+
    procedure log_interface (
       p_text in varchar2, 
       p_key in varchar2, 
@@ -293,26 +303,28 @@ create or replace package arcsql as
 
    /* 
    -----------------------------------------------------------------------------------
-   Keywords
-   -----------------------------------------------------------------------------------
-   */
-   
-   g_keyword arcsql_keyword%rowtype;
-   procedure set_keyword (p_keyword in varchar2);
-   procedure raise_keyword_not_set;
-   function does_keyword_exist (p_keyword in varchar2) return boolean;
-
-
-   /* 
-   -----------------------------------------------------------------------------------
    Alerts
    -----------------------------------------------------------------------------------
    */
 
+   g_alert_level arcsql_alert_level%rowtype;
+   g_alert arcsql_alert%rowtype;
+
+   function is_alert_open (p_alert in varchar2) return boolean;
+
+   procedure set_alert_level (p_level in number);
+
    procedure open_alert (
-      p_keyword in varchar2,
-      p_subject in varchar2,
-      p_body in varchar2);
+      -- Alert text. Is used to identify a particular alert.
+      p_alert in varchar2,
+      -- Supplemental text to add to the alert.
+      p_text in varchar2 default null,
+      -- Supports levels 1-5 (critical, high, moderate, low, informational).
+      p_level in number default 0,
+      -- Optional ',' list of contact groups.
+      p_contact_groups in varchar2 default null);
+
+   procedure close_alert (p_alert in varchar2);
 
    /* 
    -----------------------------------------------------------------------------------
@@ -351,15 +363,15 @@ create or replace package arcsql as
       p_recheck_interval in number default 0,
       p_retry_count in number default 0,
       p_retry_interval in number default 0,
-      p_retry_keyword in varchar2 default 'retry',
-      p_failed_keyword in varchar2 default 'warning',
+      p_retry_log_type in varchar2 default 'retry',
+      p_failed_log_type in varchar2 default 'warning',
       p_reminder_interval in number default 60,
-      p_reminder_keyword in varchar2 default 'warning',
+      p_reminder_log_type in varchar2 default 'warning',
       p_reminder_backoff in number default 1,
       p_abandon_interval in varchar2 default null,
-      p_abandon_keyword in varchar2 default 'abandon',
+      p_abandon_log_type in varchar2 default 'abandon',
       p_abandon_reset in varchar2 default 'N',
-      p_pass_keyword in varchar2 default 'passed'
+      p_pass_log_type in varchar2 default 'passed'
       );
 
    procedure set_app_test_profile (
@@ -383,6 +395,20 @@ create or replace package arcsql as
    function cron_match (
       p_expression in varchar2,
       p_datetime in date default sysdate) return boolean;
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Messaging
+   -----------------------------------------------------------------------------------
+   */
+
+   procedure send_message (
+      p_text in varchar2,  
+      -- ToDo: Need to set up a default log_type.
+      p_log_type in varchar2 default 'email',
+      -- ToDo: key is confusing, it sounds unique but it really isn't. Need to come up with something clearer.
+      -- p_key in varchar2 default 'arcsql',
+      p_tags in varchar2 default null);
 
 end;
 /
