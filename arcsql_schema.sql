@@ -576,7 +576,7 @@ exec drop_table('VERSION_UPDATE');
 exec drop_sequence('SEQ_VERSION_UPDATE_ID');
 
 -- uninstall: drop table arcsql_log_type cascade constraints purge;
-drop table arcsql_log_type;
+drop table arcsql_log_type cascade constraints purge;
 begin
    -- log_type is forced to lower case.
    -- New values added automatically if log_interface is called and type is not found.
@@ -774,6 +774,7 @@ begin
       alert_text varchar2(120),
       -- Unique key parsed from alert_text.
       alert_key varchar2(120),
+      status varchar2(120) not null,
       priority_level number not null,
       opened date default sysdate,
       closed date default null,
@@ -786,4 +787,3 @@ begin
    end if;
 end;
 /
-

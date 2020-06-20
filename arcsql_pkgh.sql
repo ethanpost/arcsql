@@ -56,7 +56,7 @@ create or replace package arcsql as
       p_text in varchar2,
       p_left_char in varchar2,
       p_right_char in varchar2) return varchar2;
-   
+
    function get_token (
       p_list  varchar2,
       p_index number,
@@ -306,7 +306,7 @@ create or replace package arcsql as
    g_alert_priority arcsql_alert_priority%rowtype;
    g_alert arcsql_alert%rowtype;
 
-   function is_alert_open (p_alert in varchar2) return boolean;
+   function is_alert_open (p_alert_key in varchar2) return boolean;
 
    function does_alert_priority_exist (p_priority in number) return boolean;
 
@@ -321,7 +321,7 @@ create or replace package arcsql as
       -- Optional ',' list of contact groups.
       p_contact_groups in varchar2 default null);
 
-   procedure close_alert (p_alert in varchar2);
+   procedure close_alert (p_text in varchar2);
 
    /* 
    -----------------------------------------------------------------------------------
