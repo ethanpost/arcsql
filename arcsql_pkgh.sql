@@ -52,6 +52,11 @@ create or replace package arcsql as
        digit      integer := null,
        special    integer := null) return boolean;
 
+   function str_remove_text_between (
+      p_text in varchar2,
+      p_left_char in varchar2,
+      p_right_char in varchar2) return varchar2;
+   
    function get_token (
       p_list  varchar2,
       p_index number,
@@ -311,9 +316,6 @@ create or replace package arcsql as
    function get_default_alert_priority return number;
 
    procedure open_alert (
-      -- Alert text. Is used to identify a particular alert.
-      p_alert in varchar2,
-      -- Supplemental text to add to the alert.
       p_text in varchar2 default null,
       p_priority in number default null,
       -- Optional ',' list of contact groups.

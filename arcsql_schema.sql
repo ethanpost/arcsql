@@ -759,6 +759,7 @@ begin
       close_interval number default 0 not null
       )', false);
       execute_sql('alter table arcsql_alert_priority add constraint pk_arcsql_alert_priority primary key (priority_level)', false);
+      execute_sql('alter table arcsql_alert_priority add constraint arcsql_alert_priority_fk_log_type foreign key (alert_log_type) references arcsql_log_type (log_type) on delete cascade', false);
    end if;
 end;
 /
@@ -769,9 +770,11 @@ begin
    if not does_table_exist('arcsql_alert') then 
       execute_sql('
       create table arcsql_alert (
-      alert_id varchar2(120),
+      -- Anything not in first set of [] will be used to formulate the alert_key.
       alert_text varchar2(120),
-      alert_priority number not null,
+      -- Unique key parsed from alert_text.
+      alert_key varchar2(120),
+      priority_level number not null,
       opened date default sysdate,
       closed date default null,
       abandoned date default null,
@@ -779,7 +782,7 @@ begin
       reminder_count number default 0,
       reminder_interval number default 0
       )', false);
-      execute_sql('alter table arcsql_alert add constraint pk_arcsql_alert primary key (alert_id, opened)', false);
+      execute_sql('alter table arcsql_alert add constraint pk_arcsql_alert primary key (alert_key, opened)', false);
    end if;
 end;
 /

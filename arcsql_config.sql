@@ -111,10 +111,10 @@ end;
 /
 
 begin
-   if not arcsql.does_alert_level_exist(1) then 
-      insert into arcsql_alert_level (
-         alert_level,
-         alert_type,
+   if not arcsql.does_alert_priority_exist(1) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
          alert_log_type,
          enabled,
          reminder_log_type,
@@ -143,10 +143,10 @@ end;
 /
 
 begin
-   if not arcsql.does_alert_level_exist(2) then 
-      insert into arcsql_alert_level (
-         alert_level,
-         alert_type,
+   if not arcsql.does_alert_priority_exist(2) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
          alert_log_type,
          enabled,
          reminder_log_type,
@@ -175,10 +175,10 @@ end;
 /
 
 begin
-   if not arcsql.does_alert_level_exist(3) then 
-      insert into arcsql_alert_level (
-         alert_level,
-         alert_type,
+   if not arcsql.does_alert_priority_exist(3) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
          alert_log_type,
          enabled,
          reminder_log_type,
@@ -208,10 +208,10 @@ end;
 
         
 begin
-   if not arcsql.does_alert_level_exist(4) then 
-      insert into arcsql_alert_level (
-         alert_level,
-         alert_type,
+   if not arcsql.does_alert_priority_exist(4) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
          alert_log_type,
          enabled,
          reminder_log_type,
@@ -240,10 +240,10 @@ end;
 /
 
 begin
-   if not arcsql.does_alert_level_exist(5) then 
-      insert into arcsql_alert_level (
-         alert_level,
-         alert_type,
+   if not arcsql.does_alert_priority_exist(5) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
          alert_log_type,
          enabled,
          reminder_log_type,
