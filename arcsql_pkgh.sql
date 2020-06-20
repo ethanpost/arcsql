@@ -273,15 +273,6 @@ create or replace package arcsql as
       metric_name_2 in varchar2 default null,
       metric_2 in number default null);
 
-   procedure alert (
-      alert_text in varchar2, 
-      alert_key in varchar2 default null, 
-      alert_tags in varchar2 default null,
-      metric_name_1 in varchar2 default null,
-      metric_1 in number default null,
-      metric_name_2 in varchar2 default null,
-      metric_2 in number default null);
-
    procedure fail (
       fail_text in varchar2, 
       fail_key in varchar2 default null, 
@@ -307,24 +298,24 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
-   g_alert_level arcsql_alert_level%rowtype;
+   g_alert_priority arcsql_alert_priority%rowtype;
    g_alert arcsql_alert%rowtype;
 
    function is_alert_open (p_alert in varchar2) return boolean;
 
-   function does_alert_level_exist (p_level in number) return boolean;
+   function does_alert_priority_exist (p_priority in number) return boolean;
 
-   procedure set_alert_level (p_level in number);
+   procedure set_alert_priority (p_priority in number);
 
    -- Returns 3 if nothing is set.
-   function get_default_alert_level return number;
+   function get_default_alert_priority return number;
 
    procedure open_alert (
       -- Alert text. Is used to identify a particular alert.
       p_alert in varchar2,
       -- Supplemental text to add to the alert.
       p_text in varchar2 default null,
-      p_level in number default null,
+      p_priority in number default null,
       -- Optional ',' list of contact groups.
       p_contact_groups in varchar2 default null);
 

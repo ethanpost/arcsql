@@ -1750,27 +1750,6 @@ begin
       p_metric_2=>metric_2);
 end;
 
-procedure alert (
-   alert_text in varchar2, 
-   alert_key in varchar2 default null, 
-   alert_tags in varchar2 default null,
-   metric_name_1 in varchar2 default null,
-   metric_1 in number default null,
-   metric_name_2 in varchar2 default null,
-   metric_2 in number default null) is 
-begin
-   log_interface(
-      p_text=>alert_text, 
-      p_key=>alert_key, 
-      p_tags=>alert_tags, 
-      p_level=>-1, 
-      p_type=>'alert',
-      p_metric_name_1=>metric_name_1,
-      p_metric_1=>metric_1,
-      p_metric_name_2=>metric_name_2,
-      p_metric_2=>metric_2);
-end;
-
 procedure fail (
    fail_text in varchar2, 
    fail_key in varchar2 default null, 
@@ -1809,20 +1788,6 @@ begin
    if g_contact_group.group_name is null then  
       raise_application_error(-20001, 'Contact group is not set.');
    end if;
-end;
-
-/* 
------------------------------------------------------------------------------------
-Alerts
------------------------------------------------------------------------------------
-*/
-   
-procedure open_alert (
-   p_log_type in varchar2,
-   p_subject in varchar2,
-   p_body in varchar2) is 
-begin 
-   null;
 end;
 
 /* 
@@ -2523,16 +2488,18 @@ begin
     where lower(alert_id)=lower(p_alert) 
       and closed is null;
    if n > 0 then 
+      debug('Alert is already open.');
       return true;
    else 
+      debug('Alert is not open.');
       return false;
    end if;
 end;
 
-function does_alert_level_exist(p_level in number) return boolean is 
+function does_alert_priority_exist(p_priority in number) return boolean is 
    n number;
 begin 
-   select count(*) into n from arcsql_alert_level where alert_level=p_level;
+   select count(*) into n from arcsql_alert_priority where priority_level=p_priority;
    if n > 0 then 
       return true;
    else 
@@ -2540,34 +2507,35 @@ begin
    end if;
 end;
 
-procedure set_alert_level (p_level in number) is 
+procedure set_alert_priority (p_priority in number) is 
    n number;
 begin 
    -- Get the max level alert type which is enabled.
-   g_alert_level := null;
-   select max(alert_level) into n 
-     from arcsql_alert_level 
-    where alert_level <= p_level 
+   g_alert_priority := null;
+   select max(priority_level) into n 
+     from arcsql_alert_priority 
+    where priority_level <= p_priority 
       and is_truthy_y(enabled) = 'y';
    if nvl(n, 0) > 0 then 
-      select * into g_alert_level
-        from arcsql_alert_level 
-       where alert_level=n;
+      select * into g_alert_priority
+        from arcsql_alert_priority 
+       where priority_level=n;
    else 
       -- If no alert types are enabled we still will need some values here.
-      g_alert_level.alert_level := 0;
+      g_alert_priority.priority_level := 0;
    end if;
+   debug('Set alert priority to '||g_alert_priority.priority_level);
 end;
 
-function get_default_alert_level return number is 
-   cursor default_alert_levels is 
-   select * from arcsql_alert_level 
+function get_default_alert_priority return number is 
+   cursor default_prioritys is 
+   select * from arcsql_alert_priority 
     where is_truthy_y(is_default)='y'
     order 
-       by alert_level desc;
+       by priority_level desc;
 begin 
-   for alert_level in default_alert_levels loop 
-      return alert_level.alert_level;
+   for priority_level in default_prioritys loop 
+      return priority_level.priority_level;
    end loop;
    return 3;
 end;
@@ -2577,27 +2545,48 @@ begin
    select * into g_alert from arcsql_alert where lower(alert_id)=lower(p_alert);
 end;
 
+procedure raise_alert_not_set is 
+begin 
+   if g_alert.alert_id is null then 
+      raise_application_error(-20001, 'Alert is not set.');
+   end if;
+end;
+
+procedure log_alert (
+   p_log_text in varchar2,
+   p_log_type in varchar2) is 
+begin 
+   raise_alert_not_set;
+   log_interface (
+      p_text=>p_log_text, 
+      p_key=>'Alert-'||g_alert.alert_priority, 
+      p_tags=>'alert',
+      p_level=>0, 
+      p_type=>p_log_type);
+end;
+
 procedure open_alert (
    -- Alert text. Is used to identify a particular alert.
    p_alert in varchar2,
    -- Supplemental text to add to the alert.
    p_text in varchar2 default null,
    -- Supports levels 1-5 (critical, high, moderate, low, informational).
-   p_level in number default null,
+   p_priority in number default null,
    p_contact_groups in varchar2 default null) is 
-   v_level number := p_level;
+   v_priority number := p_priority;
 begin
+   debug('open_alert');
    if not is_alert_open(p_alert) then 
-      if v_level is null then 
-         v_level := get_default_alert_level;
+      if v_priority is null then 
+         v_priority := get_default_alert_priority;
       end if;
-      set_alert_level(v_level);
+      set_alert_priority(v_priority);
       -- If all alert types are disabled skip any furthur action.
-      if g_alert_level.alert_level > 0 then
+      if g_alert_priority.priority_level > 0 then
          insert into arcsql_alert (
             alert_id,
             alert_text,
-            alert_level,
+            alert_priority,
             opened,
             closed,
             abandoned,
@@ -2607,17 +2596,17 @@ begin
             ) values (
             p_alert,
             p_text,
-            g_alert_level.alert_level,
+            g_alert_priority.priority_level,
             sysdate,
             null,
             null,
             p_contact_groups,
             0,
-            g_alert_level.reminder_interval
+            g_alert_priority.reminder_interval
             );
-         send_message (
-            p_text=>p_alert||' '||'[New Alert-'||g_alert_level.alert_level||']',
-            p_log_type=>g_alert_level.alert_log_type);
+         log_alert (
+            p_log_text=>p_alert||' '||'[New Alert-'||g_alert_priority.priority_level||']',
+            p_log_type=>g_alert_priority.alert_log_type);
       end if;
    end if;
 end;
@@ -2625,46 +2614,40 @@ end;
 procedure close_alert (p_alert in varchar2) is 
 begin 
    set_alert(p_alert);
-   set_alert_level(g_alert.alert_level);
-   if not g_alert_level.close_log_type is null then 
-      send_message('FOO');
-   end if;
+   set_alert_priority(g_alert.alert_priority);
    update arcsql_alert set closed=sysdate 
     where lower(alert_id)=lower(p_alert);
-   if not g_alert_level.close_log_type is null and g_alert_level.alert_level > 0 then
-      send_message (
-         p_text=>p_alert||' [Closing Alert-'||g_alert_level.alert_level||']',
-         p_log_type=>g_alert_level.close_log_type);
+   if not g_alert_priority.close_log_type is null and g_alert_priority.priority_level > 0 then
+      log_alert (
+         p_log_text=>p_alert||' [Closing Alert-'||g_alert_priority.priority_level||']',
+         p_log_type=>g_alert_priority.alert_log_type);
    end if;
 end;
 
 procedure abandon_alert (p_alert in varchar2) is 
 begin 
    set_alert(p_alert);
-   set_alert_level(g_alert.alert_level);
-   if not g_alert_level.abandon_log_type is null then 
-      send_message('FOO');
-   end if;
+   set_alert_priority(g_alert.alert_priority);
    update arcsql_alert set abandoned=sysdate 
     where lower(alert_id)=lower(p_alert);
-   if not g_alert_level.abandon_log_type is null and g_alert_level.alert_level > 0 then
-      send_message (
-         p_text=>p_alert||' [Abandoning Alert-'||g_alert_level.alert_level||']',
-         p_log_type=>g_alert_level.abandon_log_type);
+   if not g_alert_priority.abandon_log_type is null and g_alert_priority.priority_level > 0 then
+      log_alert (
+         p_log_text=>p_alert||' [Abandoning Alert-'||g_alert_priority.priority_level||']',
+         p_log_type=>g_alert_priority.alert_log_type);
    end if;
 end;
 
 procedure remind_alert (p_alert in varchar2) is 
 begin 
    set_alert(p_alert);
-   set_alert_level(g_alert.alert_level);
+   set_alert_priority(g_alert.alert_priority);
    update arcsql_alert 
-      set reminder_interval=reminder_interval*g_alert_level.reminder_backoff_interval,
+      set reminder_interval=reminder_interval*g_alert_priority.reminder_backoff_interval,
           reminder_count=reminder_count+1
     where lower(alert_id)=lower(p_alert);
-   send_message (
-      p_text=>p_alert||' [Reminder Alert-'||g_alert_level.alert_level||']',
-      p_log_type=>nvl(g_alert_level.reminder_log_type, g_alert_level.alert_log_type));
+   log_alert (
+      p_log_text=>p_alert||' [Remind Alert-'||g_alert_priority.priority_level||']',
+      p_log_type=>g_alert_priority.alert_log_type);
 end;
 
 procedure check_alerts is 
@@ -2673,16 +2656,16 @@ procedure check_alerts is
     where closed is null and abandoned is null;
 begin 
    for alert in alerts loop 
-      set_alert_level(alert.alert_level);
-      if g_alert_level.close_interval > 0 and alert.opened+(g_alert_level.close_interval/1440) < sysdate then 
+      set_alert_priority(alert.alert_priority);
+      if g_alert_priority.close_interval > 0 and alert.opened+(g_alert_priority.close_interval/1440) < sysdate then 
          close_alert(alert.alert_id);
       end if;
-      if g_alert_level.abandon_interval > 0 and alert.opened+(g_alert_level.abandon_interval/1440) < sysdate then 
+      if g_alert_priority.abandon_interval > 0 and alert.opened+(g_alert_priority.abandon_interval/1440) < sysdate then 
          abandon_alert(alert.alert_id);
       end if;
-      if g_alert_level.reminder_interval > 0 and 
-         alert.opened+(g_alert_level.reminder_interval/1440) < sysdate and
-         alert.reminder_count < g_alert_level.reminder_count then 
+      if g_alert_priority.reminder_interval > 0 and 
+         alert.opened+(g_alert_priority.reminder_interval/1440) < sysdate and
+         alert.reminder_count < g_alert_priority.reminder_count then 
          remind_alert(alert.alert_id);
       end if;
    end loop;

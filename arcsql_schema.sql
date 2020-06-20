@@ -593,12 +593,7 @@ end;
 /
 
 -- uninstall: drop sequence seq_arcsql_log_entry;
-begin
-   if not does_sequence_exist('seq_arcsql_log_entry') then 
-      execute_sql('create sequence seq_arcsql_log_entry', false);
-   end if;
-end;
-/
+exec create_sequence('seq_arcsql_log_entry');
 
 -- uninstall: drop table arcsql_log;
 begin 
@@ -606,15 +601,15 @@ begin
       execute_sql('
       create table arcsql_log (
       log_entry number default seq_arcsql_log_entry.nextval,
-      log_text varchar2(1000),
       log_time date default sysdate,
+      log_text varchar2(1000),
+      log_type varchar2(25) default ''log'' not null,
+      log_key varchar2(120),
+      log_tags varchar2(120),
       metric_name_1 varchar2(120) default null,
       metric_1 number default null,
       metric_name_2 varchar2(120) default null,
       metric_2 number default null,
-      log_type varchar2(25) default ''log'' not null,
-      log_key varchar2(120),
-      log_tags varchar2(120),
       audsid varchar2(120),
       username varchar2(120))', false);
       execute_sql('
@@ -738,19 +733,19 @@ begin
 end;
 /
 
--- uninstall: drop table arcsql_alert_level cascade constraints purge;
-drop table arcsql_alert_level;
+-- uninstall: drop table arcsql_alert_priority cascade constraints purge;
+drop table arcsql_alert_priority;
 begin
-   if not does_table_exist('arcsql_alert_level') then 
+   if not does_table_exist('arcsql_alert_priority') then 
       execute_sql('
-      create table arcsql_alert_level (
-      alert_level number,
-      alert_type varchar2(120),
+      create table arcsql_alert_priority (
+      priority_level number,
+      priority_name varchar2(120),
+      alert_log_type varchar2(120),
       -- Truthy values including cron expressions are allowed here.
       enabled varchar2(60) default ''Y'',
       -- Can be a truthy value including cron expression.
       is_default varchar2(120) default null,
-      alert_log_type varchar2(120),
       reminder_log_type varchar2(120),
       -- In minutes.
       reminder_interval number default 0 not null,
@@ -763,19 +758,20 @@ begin
       close_log_type varchar2(120) default null,
       close_interval number default 0 not null
       )', false);
-      execute_sql('alter table arcsql_alert_level add constraint pk_arcsql_alert_level primary key (alert_level)', false);
+      execute_sql('alter table arcsql_alert_priority add constraint pk_arcsql_alert_priority primary key (priority_level)', false);
    end if;
 end;
 /
 
 -- uninstall: drop table arcsql_alert cascade constraints purge;
+drop table arcsql_alert;
 begin
    if not does_table_exist('arcsql_alert') then 
       execute_sql('
       create table arcsql_alert (
       alert_id varchar2(120),
       alert_text varchar2(120),
-      alert_level number not null,
+      alert_priority number not null,
       opened date default sysdate,
       closed date default null,
       abandoned date default null,
@@ -783,7 +779,7 @@ begin
       reminder_count number default 0,
       reminder_interval number default 0
       )', false);
-      execute_sql('alter table arcsql_alert add constraint pk_arcsql_alert primary key (alert_id)', false);
+      execute_sql('alter table arcsql_alert add constraint pk_arcsql_alert primary key (alert_id, opened)', false);
    end if;
 end;
 /

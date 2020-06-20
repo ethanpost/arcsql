@@ -13,8 +13,6 @@ begin
 end;
 /
 
-
 exec test_arcsql_alerting;
 
 drop procedure test_arcsql_alerting;
-
