@@ -499,6 +499,10 @@ begin
       end if;
    end if;
    commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 procedure confirm_app_version(p_app_name in varchar2) is
@@ -509,6 +513,10 @@ begin
       set status='CONFIRMED'
     where app_name=upper(p_app_name);
    commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 function get_app_version(p_app_name in varchar2) return number is 
@@ -539,6 +547,10 @@ procedure delete_app_version(p_app_name in varchar2) is
 begin 
   delete from app_version where app_name=upper(p_app_name);
   commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 /* 
@@ -1644,6 +1656,11 @@ begin
       p_metric_2);
       commit;
    end if;
+   commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 procedure log (
@@ -1984,6 +2001,10 @@ begin
    end if;
 
    commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 function does_app_test_profile_exist (
@@ -2104,6 +2125,10 @@ begin
       debug2('time_to_test=false');
       return false;
    end if;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 procedure reset_app_test_profile is 
@@ -2306,6 +2331,10 @@ procedure save_app_test is
 begin 
    update app_test set row=g_app_test where test_name=g_app_test.test_name;
    commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 function cron_match (
@@ -2546,7 +2575,7 @@ begin
       -- If no alert types are enabled we still will need some values here.
       g_alert_priority.priority_level := 0;
    end if;
-   debug('Set alert priority to '||g_alert_priority.priority_level);
+   debug3('Set alert priority to '||g_alert_priority.priority_level);
 end;
 
 procedure raise_alert_priority_not_set is 
@@ -2601,7 +2630,7 @@ begin
    raise_alert_not_set;
    log_interface (
       p_text=>p_log_text, 
-      p_key=>'Alert-'||g_alert.priority_level, 
+      p_key=>'P'||g_alert.priority_level||' Alert', 
       p_tags=>'alert',
       p_level=>0, 
       p_type=>p_log_type);
@@ -2615,8 +2644,7 @@ end;
 procedure open_alert (
    p_text in varchar2 default null,
    -- Supports levels 1-5 (critical, high, moderate, low, informational).
-   p_priority in number default null,
-   p_contact_groups in varchar2 default null) is 
+   p_priority in number default null) is 
    v_priority number := p_priority;
    v_alert_key varchar2(120) := get_alert_key_from_alert_text(p_text);
 begin
@@ -2636,7 +2664,6 @@ begin
             opened,
             closed,
             abandoned,
-            contact_groups,
             reminder_count,
             reminder_interval
             ) values (
@@ -2647,13 +2674,12 @@ begin
             sysdate,
             null,
             null,
-            p_contact_groups,
             0,
             g_alert_priority.reminder_interval
             );
          set_alert(v_alert_key);
          log_alert (
-            p_log_text=>p_text||' '||'[New Alert-'||g_alert_priority.priority_level||']',
+            p_log_text=>'Opening P'||g_alert_priority.priority_level||' Alert: '||p_text,
             p_log_type=>g_alert_priority.alert_log_type);
       end if;
    end if;
@@ -2671,7 +2697,7 @@ begin
       and status in ('open', 'abandoned');
    if not g_alert_priority.close_log_type is null and g_alert_priority.priority_level > 0 then
       log_alert (
-         p_log_text=>p_text||' [Closing Alert-'||g_alert_priority.priority_level||']',
+         p_log_text=>'Closing P'||g_alert_priority.priority_level||' Alert: '||p_text,
          p_log_type=>g_alert_priority.alert_log_type);
    end if;
 end;
@@ -2688,7 +2714,7 @@ begin
       and status in ('open');
    if not g_alert_priority.abandon_log_type is null and g_alert_priority.priority_level > 0 then
       log_alert (
-         p_log_text=>p_text||' [Abandoning Alert-'||g_alert_priority.priority_level||']',
+         p_log_text=>'Abandoning P'||g_alert_priority.priority_level||' Alert: '||p_text,
          p_log_type=>g_alert_priority.alert_log_type);
    end if;
 end;
@@ -2704,7 +2730,7 @@ begin
     where alert_key=v_alert_key
       and status in ('open');
    log_alert (
-      p_log_text=>p_text||' [Remind Alert-'||g_alert_priority.priority_level||']',
+      p_log_text=>'Reminder P'||g_alert_priority.priority_level||' Alert: '||p_text,
       p_log_type=>g_alert_priority.alert_log_type);
 end;
 
@@ -2717,18 +2743,23 @@ begin
       set_alert_priority(open_alert.priority_level);
       if g_alert_priority.close_interval > 0 and 
          open_alert.opened+(g_alert_priority.close_interval/1440) < sysdate then 
-         close_alert(open_alert.alert_key);
+         close_alert(open_alert.alert_text);
       elsif g_alert_priority.abandon_interval > 0 and 
          open_alert.opened+(g_alert_priority.abandon_interval/1440) < sysdate and 
          open_alert.status = 'open' then 
-         abandon_alert(open_alert.alert_key);
+         abandon_alert(open_alert.alert_text);
       elsif g_alert_priority.reminder_interval > 0 and 
          open_alert.last_action+(g_alert_priority.reminder_interval/1440) < sysdate and
          open_alert.reminder_count < g_alert_priority.reminder_count and 
          open_alert.status = 'open' then 
-         remind_alert(open_alert.alert_key);
+         remind_alert(open_alert.alert_text);
       end if;
    end loop;
+   commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 end;

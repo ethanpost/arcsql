@@ -229,7 +229,6 @@ begin
 end;
 /
 
- 
 -- Some version of this probably comes from Steve Adams of Ixora fame.
 -- as well as plenty of other things here.
 
@@ -431,6 +430,7 @@ begin
       sql_log_total_score          number,
       sql_log_score_count          number,
       sql_log_avg_score            number,
+      rolling_avg_score            varchar2(120) default null,
       sql_log_max_score            number,
       sql_log_min_score            number,
       secs_between_snaps           number,
@@ -455,6 +455,10 @@ begin
 
    if not does_index_exist('sql_log_4') then
       execute_sql('create index sql_log_4 on sql_log (sql_log_id)', false);
+   end if;
+
+   if not does_index_exist('sql_log_5') then
+      execute_sql('create unique index sql_log_5 on sql_log (sql_id, plan_hash_value, force_matching_signature, datetime)', false);
    end if;
 
    if not does_column_exist(table_name => 'sql_log', column_name => 'norm_user_io_wait_secs') then 
@@ -499,6 +503,10 @@ begin
 
    if not does_column_exist(table_name => 'sql_log', column_name => 'sql_log_min_score') then 
       execute_sql('alter table sql_log add (sql_log_min_score number)', false);
+   end if;
+
+   if not does_column_exist(table_name => 'sql_log', column_name => 'rolling_avg_score') then 
+      execute_sql('alter table sql_log add (rolling_avg_score varchar2(120) default null)', false);
    end if;
    
 end;
@@ -650,14 +658,14 @@ create or replace view sql_snap_view as (
 /* COUNTERS */
 
 -- uninstall: drop sequence seq_counter_id;
--- uninstall: drop table counter;
+-- uninstall: drop table arcsql_counter;
 begin
    if not does_sequence_exist('seq_counter_id') then 
       execute_sql('create sequence seq_counter_id');
    end if;
-   if not does_table_exist('counter') then
+   if not does_table_exist('arcsql_counter') then
        execute_sql('
-       create table counter (
+       create table arcsql_counter (
        id number not null,
        counter_group varchar2(100) not null,
        subgroup varchar2(100) default null,
@@ -666,7 +674,7 @@ begin
        update_time date default sysdate
        )', false);
     
-      execute_sql('create index counter_1 on counter (name)', true);
+      execute_sql('create index arcsql_counter_1 on arcsql_counter (name)', true);
     
     end if;
 end;
@@ -771,32 +779,59 @@ end;
 exec drop_table('VERSION_UPDATE');
 exec drop_sequence('SEQ_VERSION_UPDATE_ID');
 
--- uninstall: drop sequence seq_arcsql_log_entry;
+-- uninstall: drop table arcsql_log_type cascade constraints purge;
+drop table arcsql_log_type cascade constraints purge;
 begin
-   if not does_sequence_exist('seq_arcsql_log_entry') then 
-      execute_sql('create sequence seq_arcsql_log_entry', false);
+   -- log_type is forced to lower case.
+   -- New values added automatically if log_interface is called and type is not found.
+   if not does_table_exist('arcsql_log_type') then 
+      execute_sql('
+      create table arcsql_log_type (
+      log_type varchar2(120),
+      sends_email varchar2(1) default ''Y'',
+      sends_sms varchar2(1) default ''N''
+      )', false);
+      execute_sql('alter table arcsql_log_type add constraint pk_arcsql_log_type primary key (log_type)', false);
    end if;
 end;
 /
 
-drop table arcsql_log;
+-- uninstall: drop sequence seq_arcsql_log_entry;
+exec create_sequence('seq_arcsql_log_entry');
+
 -- uninstall: drop table arcsql_log;
 begin 
    if not does_table_exist('arcsql_log') then 
       execute_sql('
       create table arcsql_log (
       log_entry number default seq_arcsql_log_entry.nextval,
-      log_text varchar2(1000),
       log_time date default sysdate,
+      log_text varchar2(1000),
       log_type varchar2(25) default ''log'' not null,
       log_key varchar2(120),
       log_tags varchar2(120),
+      metric_name_1 varchar2(120) default null,
+      metric_1 number default null,
+      metric_name_2 varchar2(120) default null,
+      metric_2 number default null,
       audsid varchar2(120),
       username varchar2(120))', false);
       execute_sql('
       create index arcsql_log_1 on arcsql_log(log_entry)', false);
       execute_sql('
       create index arcsql_log_2 on arcsql_log(log_time)', false);   
+   end if;
+   if not does_column_exist('arcsql_log', 'metric_name_1') then 
+      execute_sql('alter table arcsql_log add (metric_name_1 varchar2(120) default null)', false);
+   end if;
+   if not does_column_exist('arcsql_log', 'metric_1') then 
+      execute_sql('alter table arcsql_log add (metric_1 number default null)', false);
+   end if;
+   if not does_column_exist('arcsql_log', 'metric_name_2') then 
+      execute_sql('alter table arcsql_log add (metric_name_2 varchar2(120) default null)', false);
+   end if;
+   if not does_column_exist('arcsql_log', 'metric_2') then 
+      execute_sql('alter table arcsql_log add (metric_2 number default null)', false);
    end if;
 end;
 /
@@ -823,24 +858,24 @@ begin
       retry_count number default 0 not null,
       -- The interval to wait before allowing a retry, if null then test_interval is used.
       retry_interval number default 0 not null,
-      -- Keyword to log when a retry is attempted.
-      retry_keyword varchar2(120) default null,
-      -- Keyword to log when state changes to failed.
-      failed_keyword varchar2(120),
+      -- Log type to log when a retry is attempted.
+      retry_log_type varchar2(120) default null,
+      -- Log type to log when state changes to failed.
+      failed_log_type varchar2(120),
       -- Interval to wait between reminders. If null reminders are not sent.
       reminder_interval number default null,
-      -- Keyword to log when a reminder is sent.
-      reminder_keyword varchar2(120),
+      -- Log type to log when a reminder is sent.
+      reminder_log_type varchar2(120),
       -- Dynamically change the interval each time the reminder runs by some # or %.
       reminder_backoff number default 1 not null,
       -- Interval to wait before test is abandoned (test is still run but no reporting takes place if it continues to fail.)
       abandon_interval number default null,
-      -- Keyword to log when abandon occurs.
-      abandon_keyword varchar2(120) default null,
+      -- Log type to log when abandon occurs.
+      abandon_log_type varchar2(120) default null,
       -- If Y test resets automatically to passing on abandon.
       abandon_reset varchar2(1) default ''N'',
-      -- Keyword to log when test changes from fail to pass.
-      pass_keyword varchar2(120))', false);
+      -- Log type to log when test changes from fail to pass.
+      pass_log_type varchar2(120))', false);
       execute_sql('create index test_profile_1 on app_test_profile (profile_name, env_type)', false);
     end if;
 end;
@@ -878,6 +913,84 @@ begin
 end;
 /
 
+-- uninstall: drop table contact_group cascade constraints purge;
+begin
+   if not does_table_exist('arcsql_contact_group') then 
+      execute_sql('
+      create table arcsql_contact_group (
+      group_name varchar2(120),
+      email_addresses varchar2(1000),
+      sms_addresses varchar2(1000),
+      is_default varchar2(1) default ''Y'' not null,
+      is_group_enabled varchar2(1) default ''Y'' not null,
+      is_group_on_hold varchar2(1) default ''N'' not null,
+      is_sms_disabled varchar2(1) default ''Y'' not null,
+      -- Amount of time the oldest message can sit in the queue before sending all messages in the queue.
+      max_queue_secs number default 0,
+      -- The amount of time the most recent message can sit in the queue without a new message arriving before sending all of the messages in the queue.
+      max_idle_secs number default 0,
+      -- The maximum # of messages that the queue can hold before sending all of the messaged in the queue.
+      max_count number default 0
+      )', false);
+      execute_sql('alter table arcsql_contact_group add constraint pk_arcsql_contact_group primary key (group_name)', false);
+   end if;
+end;
+/
+
+-- uninstall: drop table arcsql_alert_priority cascade constraints purge;
+drop table arcsql_alert_priority;
+begin
+   if not does_table_exist('arcsql_alert_priority') then 
+      execute_sql('
+      create table arcsql_alert_priority (
+      priority_level number,
+      priority_name varchar2(120),
+      alert_log_type varchar2(120) not null,
+      -- Truthy values including cron expressions are allowed here.
+      enabled varchar2(60) default ''Y'' not null,
+      -- Can be a truthy value including cron expression.
+      is_default varchar2(120) default null,
+      reminder_log_type varchar2(120) default null,
+      -- In minutes.
+      reminder_interval number default 0 not null,
+      reminder_count number default 0 not null,
+      -- Reminder interval is multiplied by this value after each reminder to set the subsequent interval.
+      reminder_backoff_interval number default 1 not null,
+      abandon_log_type varchar2(120) default null,
+      abandon_interval number default 0 not null,
+      -- Automatically close the alert when interval (min) elapses.
+      close_log_type varchar2(120) default null,
+      close_interval number default 0 not null
+      )', false);
+      execute_sql('alter table arcsql_alert_priority add constraint pk_arcsql_alert_priority primary key (priority_level)', false);
+      execute_sql('alter table arcsql_alert_priority add constraint arcsql_alert_priority_fk_log_type foreign key (alert_log_type) references arcsql_log_type (log_type) on delete cascade', false);
+   end if;
+end;
+/
+
+-- uninstall: drop table arcsql_alert cascade constraints purge;
+drop table arcsql_alert;
+begin
+   if not does_table_exist('arcsql_alert') then 
+      execute_sql('
+      create table arcsql_alert (
+      -- Anything not in first set of [] will be used to formulate the alert_key.
+      alert_text varchar2(120),
+      -- Unique key parsed from alert_text.
+      alert_key varchar2(120),
+      status varchar2(120) not null,
+      priority_level number not null,
+      opened date default sysdate,
+      closed date default null,
+      abandoned date default null,
+      reminder_count number default 0,
+      last_action date default sysdate,
+      reminder_interval number default 0
+      )', false);
+      execute_sql('alter table arcsql_alert add constraint pk_arcsql_alert primary key (alert_key, opened)', false);
+   end if;
+end;
+/
 
 create or replace package arcsql as
 
@@ -891,6 +1004,18 @@ create or replace package arcsql as
    function secs_between_timestamps (time_start in timestamp, time_end in timestamp) return number;
    -- return the # of seconds since a timestamp.
    function secs_since_timestamp(time_stamp timestamp) return number;
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Timer
+   -----------------------------------------------------------------------------------
+   */
+
+   type table_type is table of date index by varchar2(120);
+
+   g_timer_start table_type;
+   procedure start_timer(p_key in varchar2);
+   function get_timer(p_key in varchar2) return number;
 
    /* 
    -----------------------------------------------------------------------------------
@@ -913,13 +1038,29 @@ create or replace package arcsql as
 
    -- Borrowed and adapted from the ora_complexity_check function.
    function str_complexity_check
-   (text   varchar2,
-    chars      integer := null,
-    letter     integer := null,
-    uppercase  integer := null,
-    lowercase  integer := null,
-    digit      integer := null,
-    special    integer := null) return boolean;
+      (text   varchar2,
+       chars      integer := null,
+       letter     integer := null,
+       uppercase  integer := null,
+       lowercase  integer := null,
+       digit      integer := null,
+       special    integer := null) return boolean;
+
+   function str_remove_text_between (
+      p_text in varchar2,
+      p_left_char in varchar2,
+      p_right_char in varchar2) return varchar2;
+
+   function get_token (
+      p_list  varchar2,
+      p_index number,
+      p_delim varchar2 := ',') return varchar2;
+
+   function shift_list (
+      p_list in varchar2,
+      p_token in varchar2 default ',',
+      p_shift_count in number default 1,
+      p_max_items in number default null) return varchar2;
 
    /* 
    -----------------------------------------------------------------------------------
@@ -947,6 +1088,8 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
+   function is_truthy (p_val in varchar2) return boolean;
+   function is_truthy_y (p_val in varchar2) return varchar2;
    -- Create a copy of a table and possibly drop the existing copy if it already exists.
    procedure backup_table (sourceTable varchar2, newTable varchar2, dropTable boolean := false);
    -- Connect to an external file as a local table.
@@ -1033,12 +1176,18 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
-   -- Starts an event. It is linked to the current session.
-   procedure start_event (event_group varchar2, subgroup varchar2, name varchar2);
-   -- Stops an event. Must have been started within the same session.
-   procedure stop_event (event_group varchar2, subgroup varchar2, name varchar2);
-   -- Deletes an event from the event table. This is a global action, not session.
-   procedure delete_event (event_group varchar2, subgroup varchar2, name varchar2);
+   procedure start_event (
+      event_group in varchar2, 
+      subgroup in varchar2, 
+      name in varchar2);
+   procedure stop_event (
+      event_group in varchar2, 
+      subgroup in varchar2, 
+      name in varchar2);
+   procedure delete_event (
+      event_group in varchar2, 
+      subgroup in varchar2, 
+      name in varchar2);
    procedure purge_events;
 
    /* 
@@ -1048,15 +1197,128 @@ create or replace package arcsql as
    */
 
    log_level number default 1;
-   procedure log (log_text in varchar2, log_key in varchar2 default null, log_tags in varchar2 default null);
-   procedure audit (audit_text in varchar2, audit_key in varchar2 default null, audit_tags in varchar2 default null);
-   procedure err (error_text in varchar2, error_key in varchar2 default null, error_tags in varchar2 default null);
-   procedure debug (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null);
-   procedure debug2 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null);
-   procedure debug3 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null);
-   procedure alert (alert_text in varchar2, alert_key in varchar2 default null, alert_tags in varchar2 default null);
-   procedure fail (fail_text in varchar2, fail_key in varchar2 default null, fail_tags in varchar2 default null);
+
+   g_log_type arcsql_log_type%rowtype;
+
+   procedure set_log_type (p_log_type in varchar2);
+
+   procedure raise_log_type_not_set;
+
+   function does_log_type_exist (p_log_type in varchar2) return boolean;
+
+   procedure log_interface (
+      p_text in varchar2, 
+      p_key in varchar2, 
+      p_tags in varchar2,
+      p_level in number,
+      p_type in varchar2,
+      p_metric_name_1 in varchar2 default null,
+      p_metric_1 in number default null,
+      p_metric_name_2 in varchar2 default null,
+      p_metric_2 in number default null
+      );
+
+   procedure log (
+      log_text in varchar2, 
+      log_key in varchar2 default null, 
+      log_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure audit (
+      audit_text in varchar2, 
+      audit_key in varchar2 default null, 
+      audit_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure err (
+      error_text in varchar2, 
+      error_key in varchar2 default null, 
+      error_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure debug (
+      debug_text in varchar2, 
+      debug_key in varchar2 default null, 
+      debug_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure debug2 (
+      debug_text in varchar2, 
+      debug_key in varchar2 default null, 
+      debug_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure debug3 (
+      debug_text in varchar2, 
+      debug_key in varchar2 default null, 
+      debug_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure fail (
+      fail_text in varchar2, 
+      fail_key in varchar2 default null, 
+      fail_tags in varchar2 default null,
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Contact Groups
+   -----------------------------------------------------------------------------------
+   */
    
+   g_contact_group arcsql_contact_group%rowtype;
+   procedure set_contact_group (p_group_name in varchar2);
+   procedure raise_contact_group_not_set;
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Alerts
+   -----------------------------------------------------------------------------------
+   */
+
+   g_alert_priority arcsql_alert_priority%rowtype;
+   g_alert arcsql_alert%rowtype;
+
+   function is_alert_open (p_alert_key in varchar2) return boolean;
+
+   function does_alert_priority_exist (p_priority in number) return boolean;
+
+   procedure set_alert_priority (p_priority in number);
+
+   procedure save_alert_priority;
+
+   -- Returns 3 if nothing is set.
+   function get_default_alert_priority return number;
+
+   procedure open_alert (
+      p_text in varchar2 default null,
+      p_priority in number default null);
+
+   procedure close_alert (p_text in varchar2);
+
+   procedure check_alerts;
+
    /* 
    -----------------------------------------------------------------------------------
    Unit Testing
@@ -1094,15 +1356,15 @@ create or replace package arcsql as
       p_recheck_interval in number default 0,
       p_retry_count in number default 0,
       p_retry_interval in number default 0,
-      p_retry_keyword in varchar2 default 'retry',
-      p_failed_keyword in varchar2 default 'warning',
+      p_retry_log_type in varchar2 default 'retry',
+      p_failed_log_type in varchar2 default 'warning',
       p_reminder_interval in number default 60,
-      p_reminder_keyword in varchar2 default 'warning',
+      p_reminder_log_type in varchar2 default 'warning',
       p_reminder_backoff in number default 1,
       p_abandon_interval in varchar2 default null,
-      p_abandon_keyword in varchar2 default 'abandon',
+      p_abandon_log_type in varchar2 default 'abandon',
       p_abandon_reset in varchar2 default 'N',
-      p_pass_keyword in varchar2 default 'passed'
+      p_pass_log_type in varchar2 default 'passed'
       );
 
    procedure set_app_test_profile (
@@ -1123,13 +1385,40 @@ create or replace package arcsql as
    procedure app_test_pass;
    procedure app_test_done;
 
+   function cron_match (
+      p_expression in varchar2,
+      p_datetime in date default sysdate) return boolean;
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Messaging
+   -----------------------------------------------------------------------------------
+   */
+
+   procedure send_message (
+      p_text in varchar2,  
+      -- ToDo: Need to set up a default log_type.
+      p_log_type in varchar2 default 'email',
+      -- ToDo: key is confusing, it sounds unique but it really isn't. Need to come up with something clearer.
+      -- p_key in varchar2 default 'arcsql',
+      p_tags in varchar2 default null);
+
 end;
 /
 
 
 create or replace package body arcsql as
 
+/* 
+-----------------------------------------------------------------------------------
+Datetime
+-----------------------------------------------------------------------------------
+*/
+
 function secs_between_timestamps (time_start in timestamp, time_end in timestamp) return number is
+   -- Return the number of seconds between two timestamps.
+   -- Doing date math with date type is easy. This function tries to make it just as simple to 
+   -- work with a timestamp.
    total_secs number;
    d interval day(9) to second(6);
 begin
@@ -1148,6 +1437,38 @@ begin
    total_secs := abs(extract(second from d) + extract(minute from d)*60 + extract(hour from d)*60*60 + extract(day from d)*24*60*60);
    return total_secs;
 end;
+
+procedure raise_invalid_cron_expression (p_expression in varchar2) is 
+begin 
+   null;
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Timer
+-----------------------------------------------------------------------------------
+*/
+
+procedure start_timer(p_key in varchar2) is 
+begin 
+   -- Sets the timer variable to current time.
+   g_timer_start(p_key) := sysdate;
+end;
+
+function get_timer(p_key in varchar2) return number is
+   -- Returns seconds since last call to 'get_time' or 'start_time' (within the same session).
+   r number;
+begin 
+   r := round((sysdate-nvl(g_timer_start(p_key), sysdate))*24*60*60, 1);
+   g_timer_start(p_key) := sysdate;
+   return r;
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Strings
+-----------------------------------------------------------------------------------
+*/
 
 function str_to_key_str (str in varchar2) return varchar2 is
    new_str varchar2(1000);
@@ -1204,6 +1525,7 @@ exception
 end;
 
 function str_is_number_y_or_n (text varchar2) return varchar2 is
+   -- Return true if the provided string evalutes to a number.
    x number;
 begin
    x := to_number(text);
@@ -1214,6 +1536,7 @@ exception
 end;
 
 function str_complexity_check
+   -- Return true if the complexity of 'text' meets the provided requirements.
    (text   varchar2,
     chars      integer := null,
     letter     integer := null,
@@ -1294,6 +1617,97 @@ begin
    return true;
 end;
 
+function str_remove_text_between (
+   p_text in varchar2,
+   p_left_char in varchar2,
+   p_right_char in varchar2) return varchar2 is 
+   -- Removes everything between pairs of characters from a string.
+   -- i.e. 'foo [x] bar [y]' becomes 'foo bar'.
+   start_pos number;
+   end_pos number;
+   left_side varchar2(2000);
+   right_side varchar2(2000);
+   v_text varchar2(2000) := p_text;
+begin 
+   while instr(v_text, p_left_char) > 0 and instr(v_text, p_right_char) > 0 loop 
+      start_pos := instr(v_text, '[');
+      end_pos := instr(v_text, ']');
+      left_side := rtrim(substr(v_text, 1, start_pos-1));
+      right_side := ltrim(substr(v_text, end_pos+1));
+      v_text := left_side||' '||right_side;
+   end loop;
+   return v_text;
+end;
+
+function get_token (
+   p_list  varchar2,
+   p_index number,
+   p_delim varchar2 := ',') return varchar2 is 
+   -- Return a single member of a list in the form of 'a,b,c'.
+   -- Largely taken from https://glosoli.blogspot.com/2006/07/oracle-plsql-function-to-split-strings.html.
+   start_pos number;
+   end_pos   number;
+begin
+   if p_index = 1 then
+       start_pos := 1;
+   else
+       start_pos := instr(p_list, p_delim, 1, p_index - 1);
+       if start_pos = 0 then
+           return null;
+       else
+           start_pos := start_pos + length(p_delim);
+       end if;
+   end if;
+
+   end_pos := instr(p_list, p_delim, start_pos, 1);
+
+   if end_pos = 0 then
+       return substr(p_list, start_pos);
+   else
+       return substr(p_list, start_pos, end_pos - start_pos);
+   end if;
+exception
+   when others then
+      raise;
+end get_token;
+
+function shift_list (
+   p_list in varchar2,
+   p_token in varchar2 default ',',
+   p_shift_count in number default 1,
+   p_max_items in number default null) return varchar2 is 
+   token_count number;
+   v_list varchar2(1000) := trim(p_list);
+   v_shift_count number := p_shift_count;
+begin 
+   if p_list is null or 
+      length(trim(p_list)) = 0 then
+      return null;
+   end if;
+   if not p_max_items is null then 
+      token_count := regexp_count(v_list, p_token);
+      v_shift_count := (token_count + 1) - p_max_items;
+   end if;
+   if v_shift_count <= 0 then 
+      return trim(v_list);
+   end if;
+   for i in 1 .. v_shift_count loop 
+      token_count := regexp_count(v_list, p_token);
+      if token_count = 0 then 
+         return null;
+      else 
+         v_list := substr(v_list, instr(v_list, p_token)+1);
+      end if;
+   end loop;
+   return trim(v_list);
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Numbers
+-----------------------------------------------------------------------------------
+*/
+
 function num_get_variance_pct (
       p_val number,
       p_pct_chance number,
@@ -1324,6 +1738,33 @@ begin
    end if;
    p_new_val := p_val + round(dbms_random.value(p_change_low, p_change_high), p_decimals);
    return round(p_new_val, p_decimals);
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Utilities
+-----------------------------------------------------------------------------------
+*/
+
+function is_truthy (p_val in varchar2) return boolean is 
+begin
+   if lower(p_val) in ('y','yes', '1', 'true') then
+      return true;
+   elsif instr(p_val, ' ') > 0 then 
+      if cron_match(p_val) then 
+         return true;
+      end if;
+   end if;
+   return false;
+end;
+
+function is_truthy_y (p_val in varchar2) return varchar2 is 
+begin 
+   if is_truthy(p_val) then 
+      return 'y';
+   else 
+      return 'n';
+   end if;
 end;
 
 procedure backup_table (sourceTable varchar2, newTable varchar2, dropTable boolean := false) is
@@ -1467,6 +1908,10 @@ begin
       end if;
    end if;
    commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 procedure confirm_app_version(p_app_name in varchar2) is
@@ -1477,6 +1922,10 @@ begin
       set status='CONFIRMED'
     where app_name=upper(p_app_name);
    commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 function get_app_version(p_app_name in varchar2) return number is 
@@ -1507,13 +1956,16 @@ procedure delete_app_version(p_app_name in varchar2) is
 begin 
   delete from app_version where app_name=upper(p_app_name);
   commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 /* 
-SIMPLE KEY VALUE STORE 
-
-ToDo: 
-- Change input vars so they are consistent.
+-----------------------------------------------------------------------------------
+Key/Value Database
+-----------------------------------------------------------------------------------
 */
 
 procedure cache (
@@ -1567,7 +2019,11 @@ begin
     where key=lower(cache_key);
 end;
 
-/* CUSTOM SETTINGS */
+/* 
+-----------------------------------------------------------------------------------
+Configuration
+-----------------------------------------------------------------------------------
+*/
 
 procedure remove_config (name varchar2) is
 begin
@@ -1603,7 +2059,11 @@ exception
       return null;
 end;
 
-/* SQL LOG */
+/* 
+-----------------------------------------------------------------------------------
+SQL Monitoring
+-----------------------------------------------------------------------------------
+*/
 
 function get_sql_log_analyze_min_secs return number is
 begin  
@@ -2160,7 +2620,7 @@ procedure run_sql_log_update is
                          and a.force_matching_signature=b.force_matching_signature);
    n number;
    last_elap_secs_per_exe  number;
-
+   v_sql_log sql_log%rowtype;
 begin
    select count(*) into n from sql_snap where rownum < 2;
    if n = 0 then
@@ -2187,7 +2647,31 @@ begin
             and datetime=trunc(sysdate, 'HH24');
 
          if sql%rowcount = 0 then
-            -- This is a new SQL and we need to insert it.
+
+            -- Try to load previous record if it exist.
+            select max(datetime) into v_sql_log.datetime 
+              from sql_log
+             where sql_id=s.sql_id 
+               and plan_hash_value=s.plan_hash_value 
+               and force_matching_signature=s.force_matching_signature 
+               and datetime!=trunc(sysdate, 'HH24');
+
+            if not v_sql_log.datetime  is null then 
+               select * into v_sql_log
+                 from sql_log 
+                where sql_id=s.sql_id 
+                  and plan_hash_value=s.plan_hash_value 
+                  and force_matching_signature=s.force_matching_signature 
+                  and datetime=v_sql_log.datetime;
+               v_sql_log.rolling_avg_score := shift_list(
+                  p_list=>v_sql_log.rolling_avg_score,
+                  p_token=>',',
+                  p_max_items=>24) || ',' || to_char(v_sql_log.sql_log_avg_score);
+            else 
+               v_sql_log.rolling_avg_score := null;
+            end if;
+
+            -- This is a new SQL or new hour and we need to insert it.
             insert into sql_log (
                sql_log_id, 
                sql_id, 
@@ -2207,6 +2691,7 @@ begin
                sql_log_score_count,
                sql_log_total_score,
                sql_log_avg_score,
+               rolling_avg_score,
                service,
                module,
                action) values (
@@ -2226,9 +2711,11 @@ begin
                0,
                0,
                null,
+               v_sql_log.rolling_avg_score,
                s.service,
                s.module,
                s.action);
+
          end if;
 
          if s.executions = 0 then
@@ -2258,12 +2745,20 @@ begin
 
 end;
 
+/* 
+-----------------------------------------------------------------------------------
+Counters
+-----------------------------------------------------------------------------------
+*/
 
-function does_counter_exist (counter_group varchar2, subgroup varchar2, name varchar2) return boolean is 
+function does_counter_exist (
+   counter_group varchar2, 
+   subgroup varchar2, 
+   name varchar2) return boolean is 
    n number;
 begin
    select count(*) into n 
-     from counter 
+     from arcsql_counter 
     where counter_group=does_counter_exist.counter_group 
       and nvl(subgroup, '~')=nvl(does_counter_exist.subgroup, '~')
       and name=does_counter_exist.name;
@@ -2274,10 +2769,16 @@ begin
    end if;
 end;
 
-procedure set_counter (counter_group varchar2, subgroup varchar2, name varchar2, equal number default null, add number default null, subtract number default null) is
+procedure set_counter (
+  counter_group varchar2, 
+  subgroup varchar2, 
+  name varchar2, 
+  equal number default null, 
+  add number default null, 
+  subtract number default null) is
 begin
    if not does_counter_exist(counter_group=>set_counter.counter_group, subgroup=>set_counter.subgroup, name=>set_counter.name) then 
-      insert into counter (
+      insert into arcsql_counter (
       id,
       counter_group,
       subgroup,
@@ -2291,7 +2792,7 @@ begin
       nvl(set_counter.equal, 0),
       sysdate);
    end if;
-   update counter 
+   update arcsql_counter 
       set value=nvl(set_counter.equal, value)+nvl(set_counter.add, 0)-nvl(set_counter.subtract, 0),
           update_time = sysdate
     where counter_group=set_counter.counter_group 
@@ -2299,10 +2800,13 @@ begin
       and name=set_counter.name;
 end;
 
-procedure delete_counter (counter_group varchar2, subgroup varchar2, name varchar2) is
+procedure delete_counter (
+  counter_group varchar2, 
+  subgroup varchar2, 
+  name varchar2) is
 begin 
    if does_counter_exist(counter_group=>delete_counter.counter_group, subgroup=>delete_counter.subgroup, name=>delete_counter.name) then 
-      delete from counter 
+      delete from arcsql_counter 
        where counter_group=delete_counter.counter_group 
          and nvl(subgroup, '~')=nvl(delete_counter.subgroup, '~')
          and name=delete_counter.name;
@@ -2328,14 +2832,14 @@ begin
    delete from audsid_event where start_time < sysdate-v_hours/24;
 end;
 
-procedure start_event (event_group varchar2, subgroup varchar2, name varchar2) is 
-/*
-Start timing an event.
->>> start_event (event_group, subgroup, name);
--event_group: Event group (string). Required.
--subgroup: Event subgroup (string). Can be null.
--name: Event name (string). Unique within a event_group and sub_group.
-*/
+procedure start_event (
+   event_group in varchar2, 
+   subgroup in varchar2, 
+   name in varchar2) is 
+-- Start an event timer (autonomous transaction).
+-- event_group: Event group (string). Required.
+-- subgroup: Event subgroup (string). Can be null.
+-- name: Event name (string). Unique within a event_group/sub_group.
    v_audsid number := get_audsid;
    pragma autonomous_transaction;
 begin 
@@ -2343,7 +2847,7 @@ begin
       set start_time=sysdate 
     where audsid=v_audsid
       and event_group=start_event.event_group
-      and nvl(subgroup, '~')=nvl(start_event.subgroup, '~')
+      and nvl(subgroup, 'x')=nvl(start_event.subgroup, 'x')
       and name=start_event.name;
    -- ToDo: If 1 we may need to log a "miss".
    if sql%rowcount = 0 then 
@@ -2367,21 +2871,18 @@ exception
       raise;
 end;
 
-procedure stop_event (event_group varchar2, subgroup varchar2, name varchar2) is 
-/*
-Stop timing an event.
->>> stop_event (event_group, subgroup, name);
--event_group: Event group (string). Required.
--subgroup: Event subgroup (string). Can be null.
--name: Event name (string). Unique within a event_group and sub_group.
-*/
+procedure stop_event (
+   event_group in varchar2, 
+   subgroup in varchar2, 
+   name in varchar2) is 
+-- Stop timing an event.
    v_start_time date;
    v_stop_time date;
    v_elapsed_seconds number;
    v_audsid number := get_audsid;
    pragma autonomous_transaction;
 begin 
-
+   -- Figure out the amount of time elapsed.
    begin
       select start_time,
              sysdate stop_time,
@@ -2392,7 +2893,7 @@ begin
         from audsid_event 
        where audsid=v_audsid
          and event_group=stop_event.event_group
-         and nvl(subgroup, '~')=nvl(stop_event.subgroup, '~')
+         and nvl(subgroup, 'x')=nvl(stop_event.subgroup, 'x')
          and name=stop_event.name;
    exception
       when no_data_found then 
@@ -2400,12 +2901,14 @@ begin
          return;
    end;
 
+   -- Delete the reference we use to calc elap time for this event/session.
    delete from audsid_event
     where audsid=v_audsid
       and event_group=stop_event.event_group
-      and nvl(subgroup, '~')=nvl(stop_event.subgroup, '~')
+      and nvl(subgroup, 'x')=nvl(stop_event.subgroup, 'x')
       and name=stop_event.name;
 
+   -- Update the consolidated record in the arcsql_event table.
    update arcsql_event set 
       event_count=event_count+1,
       total_secs=total_secs+v_elapsed_seconds,
@@ -2442,20 +2945,17 @@ exception
       raise;
 end;
 
-procedure delete_event (event_group varchar2, subgroup varchar2, name varchar2) is 
-/*
-Delete all references to an event.
->>> delete_event (event_group, subgroup, name);
--event_group: Event group (string). Required.
--subgroup: Event subgroup (string). Can be null.
--name: Event name (string). Unique within a event_group and sub_group.
-*/
+procedure delete_event (
+   event_group in varchar2, 
+   subgroup in varchar2, 
+   name in varchar2) is 
+-- Delete event data.
    pragma autonomous_transaction;
    v_audsid number := get_audsid;
 begin 
    delete from arcsql_event 
     where event_group=delete_event.event_group
-      and nvl(subgroup, '~')=nvl(delete_event.subgroup, '~')
+      and nvl(subgroup, 'x')=nvl(delete_event.subgroup, 'x')
       and name=delete_event.name;
    commit;
 exception
@@ -2498,82 +2998,251 @@ Logging
 -----------------------------------------------------------------------------------
 */
 
+procedure set_log_type (p_log_type in varchar2) is 
+begin 
+   select * into g_log_type from arcsql_log_type
+    where log_type=p_log_type;
+end;
+
+procedure raise_log_type_not_set is 
+begin 
+   if g_log_type.log_type is null then  
+      raise_application_error(-20001, 'Log type is not set.');
+   end if;
+end;
+
+function does_log_type_exist (p_log_type in varchar2) return boolean is 
+   n number;
+begin 
+   select count(*) into n from arcsql_log_type 
+    where lower(log_type)=lower(p_log_type);
+   if n = 0 then 
+      return false;
+   else 
+      return true;
+   end if;
+end;
+
 procedure log_interface (
-   log_text in varchar2, 
-   log_key in varchar2, 
-   log_tags in varchar2,
-   log_level in number,
-   log_type in varchar2
+   p_text in varchar2, 
+   p_key in varchar2, 
+   p_tags in varchar2,
+   p_level in number,
+   p_type in varchar2,
+   p_metric_name_1 in varchar2 default null,
+   p_metric_1 in number default null,
+   p_metric_name_2 in varchar2 default null,
+   p_metric_2 in number default null
    ) is 
    pragma autonomous_transaction;
 begin
-   if arcsql.log_level >= log_interface.log_level  then
+   if not does_log_type_exist(p_type) then 
+      insert into arcsql_log_type (
+         log_type) values (
+         lower(p_type));
+   end if;
+   if arcsql.log_level >= p_level  then
       insert into arcsql_log (
       log_text,
       log_type,
       log_key,
       log_tags,
       audsid,
-      username) values (
-      log_interface.log_text,
-      log_interface.log_type,
-      log_interface.log_key,
-      log_interface.log_tags,
+      username,
+      metric_name_1,
+      metric_1,
+      metric_name_2,
+      metric_2) values (
+      p_text,
+      lower(p_type),
+      p_key,
+      p_tags,
       get_audsid,
-      user);
+      user,
+      p_metric_name_1,
+      p_metric_1,
+      p_metric_name_2,
+      p_metric_2);
       commit;
+   end if;
+   commit;
+exception 
+   when others then 
+      rollback;
+      raise;
+end;
+
+procedure log (
+   log_text in varchar2, 
+   log_key in varchar2 default null, 
+   log_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>log_text, 
+      p_key=>log_key, 
+      p_tags=>log_tags, 
+      p_level=>0, 
+      p_type=>'log',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+procedure audit (
+   audit_text in varchar2, 
+   audit_key in varchar2 default null, 
+   audit_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>audit_text, 
+      p_key=>audit_key, 
+      p_tags=>audit_tags, 
+      p_level=>0, 
+      p_type=>'audit',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+procedure err (
+   error_text in varchar2, 
+   error_key in varchar2 default null, 
+   error_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>error_text, 
+      p_key=>error_key, 
+      p_tags=>error_tags, 
+      p_level=>-1, 
+      p_type=>'error',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+procedure debug (
+   debug_text in varchar2, 
+   debug_key in varchar2 default null, 
+   debug_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>debug_text, 
+      p_key=>debug_key, 
+      p_tags=>debug_tags, 
+      p_level=>1, 
+      p_type=>'debug',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+procedure debug2 (
+   debug_text in varchar2, 
+   debug_key in varchar2 default null, 
+   debug_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>debug_text, 
+      p_key=>debug_key, 
+      p_tags=>debug_tags, 
+      p_level=>2, 
+      p_type=>'debug2',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+procedure debug3 (
+   debug_text in varchar2, 
+   debug_key in varchar2 default null, 
+   debug_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>debug_text, 
+      p_key=>debug_key, 
+      p_tags=>debug_tags, 
+      p_level=>3, 
+      p_type=>'debug3',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+procedure fail (
+   fail_text in varchar2, 
+   fail_key in varchar2 default null, 
+   fail_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>fail_text, 
+      p_key=>fail_key, 
+      p_tags=>fail_tags, 
+      p_level=>-1, 
+      p_type=>'fail',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Contact Groups
+-----------------------------------------------------------------------------------
+*/
+
+procedure set_contact_group (p_group_name in varchar2) is 
+begin 
+   select * into g_contact_group from arcsql_contact_group
+    where group_name=p_group_name;
+end;
+
+procedure raise_contact_group_not_set is 
+begin 
+   if g_contact_group.group_name is null then  
+      raise_application_error(-20001, 'Contact group is not set.');
    end if;
 end;
 
-procedure log (log_text in varchar2, log_key in varchar2 default null, log_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
-begin
-   log_interface(log_text, log_key, log_tags, 0, 'log');
-end;
-
-procedure audit (audit_text in varchar2, audit_key in varchar2 default null, audit_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
-begin
-   log_interface(audit_text, audit_key, audit_tags, 0, 'audit');
-end;
-
-procedure err (error_text in varchar2, error_key in varchar2 default null, error_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
-begin
-   log_interface(error_text, error_key, error_tags, -1, 'error');
-end;
-
-procedure debug (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
-begin
-   log_interface(debug_text, debug_key, debug_tags, 1, 'debug');
-end;
-
-procedure debug2 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
-begin
-   log_interface(debug_text, debug_key, debug_tags, 2, 'debug2');
-end;
-
-procedure debug3 (debug_text in varchar2, debug_key in varchar2 default null, debug_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
-begin
-   log_interface(debug_text, debug_key, debug_tags, 3, 'debug3');
-end;
-
-procedure alert (alert_text in varchar2, alert_key in varchar2 default null, alert_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
-begin
-   log_interface(alert_text, alert_key, alert_tags, -1, 'alert');
-end;
-
-procedure fail (fail_text in varchar2, fail_key in varchar2 default null, fail_tags in varchar2 default null) is 
-   pragma autonomous_transaction;
-begin
-   log_interface(fail_text, fail_key, fail_tags, -1, 'fail');
-end;
-
-/* UNIT TESTING */
+/* 
+-----------------------------------------------------------------------------------
+Unit Testing
+-----------------------------------------------------------------------------------
+*/
 
 procedure pass_test is 
 begin 
@@ -2636,16 +3305,16 @@ procedure add_app_test_profile (
    p_recheck_interval in number default 0,
    p_retry_count in number default 0,
    p_retry_interval in number default 0,
-   p_retry_keyword in varchar2 default 'retry',
-   p_failed_keyword in varchar2 default 'warning',
+   p_retry_log_type in varchar2 default 'retry',
+   p_failed_log_type in varchar2 default 'warning',
    p_reminder_interval in number default 60,
-   p_reminder_keyword in varchar2 default 'warning',
+   p_reminder_log_type in varchar2 default 'warning',
    -- Interval is multiplied by this # each time a reminder is sent to set the next interval.
    p_reminder_backoff in number default 1,
    p_abandon_interval in varchar2 default null,
-   p_abandon_keyword in varchar2 default 'abandon',
+   p_abandon_log_type in varchar2 default 'abandon',
    p_abandon_reset in varchar2 default 'N',
-   p_pass_keyword in varchar2 default 'passed'
+   p_pass_log_type in varchar2 default 'passed'
    ) is
 begin
    if not does_app_test_profile_exist(p_profile_name, p_env_type) then
@@ -2657,15 +3326,15 @@ begin
       g_app_test_profile.recheck_interval := p_recheck_interval;
       g_app_test_profile.retry_count := p_retry_count;
       g_app_test_profile.retry_interval := p_retry_interval;
-      g_app_test_profile.retry_keyword := p_retry_keyword;
-      g_app_test_profile.failed_keyword := p_failed_keyword;
+      g_app_test_profile.retry_log_type := p_retry_log_type;
+      g_app_test_profile.failed_log_type := p_failed_log_type;
       g_app_test_profile.reminder_interval := p_reminder_interval;
-      g_app_test_profile.reminder_keyword := p_reminder_keyword;
+      g_app_test_profile.reminder_log_type := p_reminder_log_type;
       g_app_test_profile.reminder_backoff := p_reminder_backoff;
       g_app_test_profile.abandon_interval := p_abandon_interval;
-      g_app_test_profile.abandon_keyword := p_abandon_keyword;
+      g_app_test_profile.abandon_log_type := p_abandon_log_type;
       g_app_test_profile.abandon_reset := p_abandon_reset;
-      g_app_test_profile.pass_keyword := p_pass_keyword;
+      g_app_test_profile.pass_log_type := p_pass_log_type;
       save_app_test_profile;
    end if;
 end;
@@ -2741,6 +3410,10 @@ begin
    end if;
 
    commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 function does_app_test_profile_exist (
@@ -2837,9 +3510,9 @@ begin
       null;
    end if;
    if g_app_test.test_status in ('RETRY') and retry_interval then 
-      if not g_app_test_profile.retry_keyword is null then
+      if not g_app_test_profile.retry_log_type is null then
          arcsql.log(
-            log_text=>'['||g_app_test_profile.retry_keyword||'] Application test '''||g_app_test.test_name||''' is being retried.',
+            log_text=>'['||g_app_test_profile.retry_log_type||'] Application test '''||g_app_test.test_name||''' is being retried.',
             log_key=>'app_test');
       end if;
       time_to_test := true;
@@ -2861,6 +3534,10 @@ begin
       debug2('time_to_test=false');
       return false;
    end if;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 procedure reset_app_test_profile is 
@@ -2890,9 +3567,9 @@ procedure app_test_check is
    begin 
       g_app_test.abandon_time := sysdate;
       g_app_test.total_abandons := g_app_test.total_abandons + 1;
-      if not g_app_test_profile.abandon_keyword is null then 
+      if not g_app_test_profile.abandon_log_type is null then 
          arcsql.log(
-            log_text=>'['||g_app_test_profile.abandon_keyword||'] Application test '''||g_app_test.test_name||''' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
+            log_text=>'['||g_app_test_profile.abandon_log_type||'] Application test '''||g_app_test.test_name||''' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
             log_key=>'app_test');
       end if;
       -- If reset is Y the test changes back to PASS and will likely FAIL on the next check and cycle through the whole process again.
@@ -2926,9 +3603,9 @@ procedure app_test_check is
       g_app_test.last_reminder_time := sysdate;
       g_app_test.reminder_count := g_app_test.reminder_count + 1;
       g_app_test.total_reminders := g_app_test.total_reminders + 1;
-      if not g_app_test_profile.reminder_keyword is null then
+      if not g_app_test_profile.reminder_log_type is null then
          arcsql.log(
-            log_text=>'['||g_app_test_profile.reminder_keyword||'] A reminder that application test '''||g_app_test.test_name||''' is still failing.',
+            log_text=>'['||g_app_test_profile.reminder_log_type||'] A reminder that application test '''||g_app_test.test_name||''' is still failing.',
             log_key=>'app_test');
       end if;
    end;
@@ -2965,9 +3642,9 @@ procedure app_test_fail (p_message in varchar2 default null) is
       g_app_test.failed_time := g_app_test.test_end_time;
       g_app_test.last_reminder_time := g_app_test.test_end_time;
       g_app_test.total_failures := g_app_test.total_failures + 1;
-      if not g_app_test_profile.failed_keyword is null then 
+      if not g_app_test_profile.failed_log_type is null then 
          arcsql.log(
-            log_text=>'['||g_app_test_profile.failed_keyword||'] Application test '''||g_app_test.test_name||''' has failed.',
+            log_text=>'['||g_app_test_profile.failed_log_type||'] Application test '''||g_app_test.test_name||''' has failed.',
             log_key=>'app_test');
       end if;
    end;
@@ -3022,9 +3699,9 @@ procedure app_test_pass is
       g_app_test.reminder_count := 0;
       g_app_test.reminder_interval := g_app_test_profile.reminder_interval;
       g_app_test.retry_count := 0;
-      if not g_app_test_profile.pass_keyword is null then
+      if not g_app_test_profile.pass_log_type is null then
          arcsql.log (
-            log_text=>'['||g_app_test_profile.pass_keyword||'] Application test '''||g_app_test.test_name||''' is now passing.',
+            log_text=>'['||g_app_test_profile.pass_log_type||'] Application test '''||g_app_test.test_name||''' is now passing.',
             log_key=>'app_test');
       end if;
    end;
@@ -3063,10 +3740,441 @@ procedure save_app_test is
 begin 
    update app_test set row=g_app_test where test_name=g_app_test.test_name;
    commit;
+exception 
+   when others then 
+      rollback;
+      raise;
+end;
+
+function cron_match (
+   p_expression in varchar2,
+   p_datetime in date default sysdate) return boolean is 
+   v_expression varchar2(120) := upper(p_expression);
+   v_min varchar2(120);
+   v_hr varchar2(120);
+   v_dom varchar2(120);
+   v_mth varchar2(120);
+   v_dow varchar2(120);
+   t_min number;
+   t_hr number;
+   t_dom number;
+   t_mth number;
+   t_dow number;
+
+   function is_cron_multiple_true (v in varchar2, t in number) return boolean is 
+   begin 
+      if mod(t, to_number(replace(v, '/', ''))) = 0 then 
+         return true;
+      end if;
+      return false;
+   end;
+
+   function is_cron_in_range_true (v in varchar2, t in number) return boolean is 
+      left_side number;
+      right_side number;
+   begin 
+      left_side := get_token(p_list=>v, p_index=>1, p_delim=>'-');
+      right_side := get_token(p_list=>v, p_index=>2, p_delim=>'-');
+      -- Low value to high value.
+      if left_side < right_side then 
+         if t >= left_side and t <= right_side then 
+            return true;
+         end if;
+      else 
+         -- High value to lower value can be used for hours like 23-2 (11PM to 2AM).
+         -- Other examples: minutes 55-10, day of month 29-3, month of year 11-1.
+         if t >= left_side or t <= right_side then 
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+   function is_cron_in_list_true (v in varchar2, t in number) return boolean is 
+   begin 
+      for x in (select trim(regexp_substr(v, '[^,]+', 1, level)) l
+                  from dual
+                       connect by 
+                       level <= regexp_count(v, ',')+1) 
+      loop
+         if to_number(x.l) = t then 
+            return true;
+         end if;
+      end loop;
+      return false;
+   end;
+
+   function is_cron_part_true (v in varchar2, t in number) return boolean is 
+   begin 
+      if trim(v) = 'X' then 
+         return true;
+      end if;
+      if instr(v, '/') > 0 then 
+         if is_cron_multiple_true (v, t) then
+            return true;
+         end if;
+      elsif instr(v, '-') > 0 then 
+         if is_cron_in_range_true (v, t) then 
+            return true;
+         end if;
+      elsif instr(v, ',') > 0 then 
+         if is_cron_in_list_true (v, t) then 
+            return true;
+         end if;
+      else 
+         if to_number(v) = t then 
+            return true;
+         end if;
+      end if;
+      return false;
+   end;
+
+   function is_cron_true (v in varchar2, t in number) return boolean is 
+   begin 
+      if trim(v) = 'X' then 
+         return true;
+      end if;
+      for x in (select trim(regexp_substr(v, '[^,]+', 1, level)) l
+                  from dual
+                       connect by 
+                       level <= regexp_count(v, ',')+1) 
+      loop
+         if not is_cron_part_true(x.l, t) then 
+            return false;
+         end if;
+      end loop;
+      return true;
+   end;
+
+   function convert_dow (v in varchar2) return varchar2 is 
+       r varchar2(120);
+   begin 
+       r := replace(v, 'SUN', 0);
+       r := replace(r, 'MON', 1);
+       r := replace(r, 'TUE', 2);
+       r := replace(r, 'WED', 3);
+       r := replace(r, 'THU', 4);
+       r := replace(r, 'FRI', 5);
+       r := replace(r, 'SAT', 6);
+       return r;
+   end;
+
+   function convert_mth (v in varchar2) return varchar2 is 
+      r varchar2(120);
+   begin 
+      r := replace(v, 'JAN', 1);
+      r := replace(r, 'FEB', 2);
+      r := replace(r, 'MAR', 3);
+      r := replace(r, 'APR', 4);
+      r := replace(r, 'MAY', 5);
+      r := replace(r, 'JUN', 6);
+      r := replace(r, 'JUL', 7);
+      r := replace(r, 'AUG', 8);
+      r := replace(r, 'SEP', 9);
+      r := replace(r, 'OCT', 10);
+      r := replace(r, 'NOV', 11);
+      r := replace(r, 'DEC', 12);
+      return r;
+   end;
+
+begin 
+   -- Replace * with X.
+   v_expression := replace(v_expression, '*', 'X');
+   raise_invalid_cron_expression(v_expression);
+
+   v_min := get_token(p_list=>v_expression, p_index=>1, p_delim=>' ');
+   v_hr := get_token(p_list=>v_expression, p_index=>2, p_delim=>' ');
+   v_dom := get_token(p_list=>v_expression, p_index=>3, p_delim=>' ');
+   v_mth := convert_mth(get_token(p_list=>v_expression, p_index=>4, p_delim=>' '));
+   v_dow := convert_dow(get_token(p_list=>v_expression, p_index=>5, p_delim=>' '));
+
+   t_min := to_number(to_char(p_datetime, 'MI'));
+   t_hr := to_number(to_char(p_datetime, 'HH24'));
+   t_dom := to_number(to_char(p_datetime, 'DD'));
+   t_mth := to_number(to_char(p_datetime, 'MM'));
+   t_dow := to_number(to_char(p_datetime, 'D'));
+
+   if not is_cron_true(v_min, t_min) then 
+      return false;
+   end if;
+   if not is_cron_true(v_hr, t_hr) then 
+      return false;
+   end if;
+   if not is_cron_true(v_dom, t_dom) then 
+      return false;
+   end if;
+   if not is_cron_true(v_mth, t_mth) then 
+      return false;
+   end if;
+   if not is_cron_true(v_dow, t_dow) then 
+      return false;
+   end if;
+   return true;
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Messaging
+-----------------------------------------------------------------------------------
+*/
+
+-- The messaging interface queue leverages the logging interface.
+procedure send_message (
+   p_text in varchar2,  
+   -- ToDo: Need to set up a default log_type.
+   p_log_type in varchar2 default 'email',
+   -- ToDo: key is confusing, it sounds unique but it really isn't. Need to come up with something clearer.
+   -- p_key in varchar2 default 'arcsql',
+   p_tags in varchar2 default null) is 
+begin 
+   log_interface(
+      p_type=>p_log_type,
+      p_text=>p_text, 
+      p_key=>'message',
+      p_tags=>p_tags, 
+      p_level=>0);
+end;
+
+/* 
+-----------------------------------------------------------------------------------
+Alerting
+-----------------------------------------------------------------------------------
+*/
+
+function is_alert_open (p_alert_key in varchar2) return boolean is 
+   n number;
+begin 
+   select count(*) into n from arcsql_alert 
+    where alert_key=p_alert_key 
+      and status in ('open', 'abandoned');
+   if n > 0 then 
+      debug('Alert is already open.');
+      return true;
+   else 
+      debug('Alert is not open.');
+      return false;
+   end if;
+end;
+
+function does_alert_priority_exist(p_priority in number) return boolean is 
+   n number;
+begin 
+   select count(*) into n from arcsql_alert_priority where priority_level=p_priority;
+   if n > 0 then 
+      return true;
+   else 
+      return false;
+   end if;
+end;
+
+procedure set_alert_priority (p_priority in number) is 
+   n number;
+begin 
+   -- Get the max level alert type which is enabled.
+   g_alert_priority := null;
+   select max(priority_level) into n 
+     from arcsql_alert_priority 
+    where priority_level <= p_priority 
+      and is_truthy_y(enabled) = 'y';
+   if nvl(n, 0) > 0 then 
+      select * into g_alert_priority
+        from arcsql_alert_priority 
+       where priority_level=n;
+   else 
+      -- If no alert types are enabled we still will need some values here.
+      g_alert_priority.priority_level := 0;
+   end if;
+   debug3('Set alert priority to '||g_alert_priority.priority_level);
+end;
+
+procedure raise_alert_priority_not_set is 
+begin 
+   if g_alert_priority.priority_level is null then 
+      raise_application_error(-20001, 'Alert priority not set.');
+   end if;
+end;
+
+procedure save_alert_priority is 
+begin 
+   raise_alert_priority_not_set;
+   if does_alert_priority_exist(g_alert_priority.priority_level) then 
+      update arcsql_alert_priority set row=g_alert_priority where priority_level=g_alert_priority.priority_level;
+   else 
+      insert into arcsql_alert_priority values g_alert_priority;
+   end if;
+end;
+
+function get_default_alert_priority return number is 
+   cursor default_priorities is 
+   select * from arcsql_alert_priority 
+    where is_truthy_y(is_default)='y'
+    order 
+       by priority_level desc;
+begin 
+   for priority_level in default_priorities loop 
+      return priority_level.priority_level;
+   end loop;
+   return 3;
+end;
+
+procedure set_alert(p_alert_key in varchar2) is 
+begin 
+   select * into g_alert from arcsql_alert 
+    where alert_key=p_alert_key
+      and status in ('open', 'abandoned');
+   set_alert_priority(g_alert.priority_level);
+end;
+
+procedure raise_alert_not_set is 
+begin 
+   if g_alert.alert_key is null then 
+      raise_application_error(-20001, 'Alert is not set.');
+   end if;
+end;
+
+procedure log_alert (
+   p_log_text in varchar2,
+   p_log_type in varchar2) is 
+begin 
+   raise_alert_not_set;
+   log_interface (
+      p_text=>p_log_text, 
+      p_key=>'P'||g_alert.priority_level||' Alert', 
+      p_tags=>'alert',
+      p_level=>0, 
+      p_type=>p_log_type);
+end;
+
+function get_alert_key_from_alert_text (p_text in varchar2) return varchar2 is 
+begin 
+   return lower(replace(str_remove_text_between(p_text, '[', ']'), ' '));
+end;
+
+procedure open_alert (
+   p_text in varchar2 default null,
+   -- Supports levels 1-5 (critical, high, moderate, low, informational).
+   p_priority in number default null) is 
+   v_priority number := p_priority;
+   v_alert_key varchar2(120) := get_alert_key_from_alert_text(p_text);
+begin
+   debug('Opening an alert.');
+   if not is_alert_open(v_alert_key) then 
+      if v_priority is null then 
+         v_priority := get_default_alert_priority;
+      end if;
+      set_alert_priority(v_priority);
+      -- If all alert types are disabled skip any furthur action.
+      if g_alert_priority.priority_level > 0 then
+         insert into arcsql_alert (
+            alert_key,
+            alert_text,
+            status,
+            priority_level,
+            opened,
+            closed,
+            abandoned,
+            reminder_count,
+            reminder_interval
+            ) values (
+            v_alert_key,
+            p_text,
+            'open',
+            g_alert_priority.priority_level,
+            sysdate,
+            null,
+            null,
+            0,
+            g_alert_priority.reminder_interval
+            );
+         set_alert(v_alert_key);
+         log_alert (
+            p_log_text=>'Opening P'||g_alert_priority.priority_level||' Alert: '||p_text,
+            p_log_type=>g_alert_priority.alert_log_type);
+      end if;
+   end if;
+end;
+
+procedure close_alert (p_text in varchar2) is 
+   v_alert_key varchar2(120) := get_alert_key_from_alert_text(p_text);
+begin 
+   set_alert(v_alert_key);
+   update arcsql_alert 
+      set closed=sysdate, 
+          status='closed',
+          last_action=sysdate
+    where alert_key=v_alert_key
+      and status in ('open', 'abandoned');
+   if not g_alert_priority.close_log_type is null and g_alert_priority.priority_level > 0 then
+      log_alert (
+         p_log_text=>'Closing P'||g_alert_priority.priority_level||' Alert: '||p_text,
+         p_log_type=>g_alert_priority.alert_log_type);
+   end if;
+end;
+
+procedure abandon_alert (p_text in varchar2) is 
+   v_alert_key varchar2(120) := get_alert_key_from_alert_text(p_text);
+begin 
+   set_alert(v_alert_key);
+   update arcsql_alert 
+      set abandoned=sysdate, 
+          status='abandoned',
+          last_action=sysdate
+    where alert_key=v_alert_key
+      and status in ('open');
+   if not g_alert_priority.abandon_log_type is null and g_alert_priority.priority_level > 0 then
+      log_alert (
+         p_log_text=>'Abandoning P'||g_alert_priority.priority_level||' Alert: '||p_text,
+         p_log_type=>g_alert_priority.alert_log_type);
+   end if;
+end;
+
+procedure remind_alert (p_text in varchar2) is 
+   v_alert_key varchar2(120) := get_alert_key_from_alert_text(p_text);
+begin 
+   set_alert(v_alert_key);
+   update arcsql_alert 
+      set reminder_interval=reminder_interval*g_alert_priority.reminder_backoff_interval,
+          reminder_count=reminder_count+1,
+          last_action=sysdate
+    where alert_key=v_alert_key
+      and status in ('open');
+   log_alert (
+      p_log_text=>'Reminder P'||g_alert_priority.priority_level||' Alert: '||p_text,
+      p_log_type=>g_alert_priority.alert_log_type);
+end;
+
+procedure check_alerts is 
+   cursor alerts is 
+   select * from arcsql_alert 
+    where status in ('open', 'abandoned');
+begin 
+   for open_alert in alerts loop 
+      set_alert_priority(open_alert.priority_level);
+      if g_alert_priority.close_interval > 0 and 
+         open_alert.opened+(g_alert_priority.close_interval/1440) < sysdate then 
+         close_alert(open_alert.alert_text);
+      elsif g_alert_priority.abandon_interval > 0 and 
+         open_alert.opened+(g_alert_priority.abandon_interval/1440) < sysdate and 
+         open_alert.status = 'open' then 
+         abandon_alert(open_alert.alert_text);
+      elsif g_alert_priority.reminder_interval > 0 and 
+         open_alert.last_action+(g_alert_priority.reminder_interval/1440) < sysdate and
+         open_alert.reminder_count < g_alert_priority.reminder_count and 
+         open_alert.status = 'open' then 
+         remind_alert(open_alert.alert_text);
+      end if;
+   end loop;
+   commit;
+exception 
+   when others then 
+      rollback;
+      raise;
 end;
 
 end;
 /
+
+
 
 alter package arcsql compile;
 alter package arcsql compile body;
@@ -3099,7 +4207,250 @@ begin
 end;
 /
 
+begin 
+   if not arcsql.does_log_type_exist('alert') then 
+      insert into arcsql_log_type (log_type, sends_email) values ('alert', 'Y');
+   end if;
+end;
+/
 
+begin 
+   if not arcsql.does_log_type_exist('fail') then 
+      insert into arcsql_log_type (log_type, sends_email) values ('fail', 'Y');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('email') then 
+      insert into arcsql_log_type (log_type, sends_email) values ('email', 'Y');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('sms') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('sms', 'Y', 'Y');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('critical') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('critical', 'Y', 'Y');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('warning') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('warning', 'Y', 'N');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('high') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('high', 'Y', 'N');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('moderate') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('moderate', 'Y', 'N');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('info') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('info', 'Y', 'N');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('low') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('low', 'Y', 'N');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('notice') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('notice', 'Y', 'N');
+   end if;
+end;
+/
+
+begin 
+   if not arcsql.does_log_type_exist('notify') then 
+      insert into arcsql_log_type (log_type, sends_email, sends_sms) values ('notify', 'Y', 'N');
+   end if;
+end;
+/
+
+begin
+   if not arcsql.does_alert_priority_exist(1) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
+         alert_log_type,
+         enabled,
+         reminder_log_type,
+         reminder_interval,
+         reminder_count,
+         reminder_backoff_interval,
+         abandon_log_type,
+         abandon_interval,
+         close_log_type,
+         close_interval) values (
+         1,
+         'critical',
+         'critical',
+         'Y',
+         'high',
+         60,
+         9999,
+         2,
+         'critical',
+         0,
+         'critical',
+         0);
+      commit;
+   end if;
+end;
+/
+
+begin
+   if not arcsql.does_alert_priority_exist(2) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
+         alert_log_type,
+         enabled,
+         reminder_log_type,
+         reminder_interval,
+         reminder_count,
+         reminder_backoff_interval,
+         abandon_log_type,
+         abandon_interval,
+         close_log_type,
+         close_interval) values (
+         2,
+         'high',
+         'high',
+         'Y',
+         'high',
+         60,
+         9999,
+         2,
+         'high',
+         0,
+         'high',
+         0);
+      commit;
+   end if;
+end;
+/
+
+begin
+   if not arcsql.does_alert_priority_exist(3) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
+         alert_log_type,
+         enabled,
+         reminder_log_type,
+         reminder_interval,
+         reminder_count,
+         reminder_backoff_interval,
+         abandon_log_type,
+         abandon_interval,
+         close_log_type,
+         close_interval) values (
+         3,
+         'moderate',
+         'moderate',
+         'Y',
+         'moderate',
+         60*4,
+         9999,
+         2,
+         'moderate',
+         0,
+         'moderate',
+         0);
+      commit;
+   end if;
+end;
+/
+
+        
+begin
+   if not arcsql.does_alert_priority_exist(4) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
+         alert_log_type,
+         enabled,
+         reminder_log_type,
+         reminder_interval,
+         reminder_count,
+         reminder_backoff_interval,
+         abandon_log_type,
+         abandon_interval,
+         close_log_type,
+         close_interval) values (
+         4,
+         'low',
+         'low',
+         'Y',
+         'low',
+         60*24,
+         9999,
+         2,
+         'low',
+         0,
+         'low',
+         0);
+      commit;
+   end if;
+end;
+/
+
+begin
+   if not arcsql.does_alert_priority_exist(5) then 
+      insert into arcsql_alert_priority (
+         priority_level,
+         priority_name,
+         alert_log_type,
+         enabled,
+         reminder_log_type,
+         reminder_interval,
+         reminder_count,
+         reminder_backoff_interval,
+         abandon_log_type,
+         abandon_interval,
+         close_log_type,
+         close_interval) values (
+         5,
+         'info',
+         'info',
+         'Y',
+         'info',
+         0,
+         9999,
+         2,
+         'info',
+         0,
+         'info',
+         0);
+      commit;
+   end if;
+end;
+/
 
 
 /*

@@ -779,7 +779,6 @@ begin
       opened date default sysdate,
       closed date default null,
       abandoned date default null,
-      contact_groups varchar2(120),
       reminder_count number default 0,
       last_action date default sysdate,
       reminder_interval number default 0

@@ -319,9 +319,7 @@ create or replace package arcsql as
 
    procedure open_alert (
       p_text in varchar2 default null,
-      p_priority in number default null,
-      -- Optional ',' list of contact groups.
-      p_contact_groups in varchar2 default null);
+      p_priority in number default null);
 
    procedure close_alert (p_text in varchar2);
 

@@ -1,6 +1,5 @@
 
 
-
 @arcsql_schema_support.sql
 @arcsql_schema.sql 
 @arcsql_pkgh.sql 
@@ -10,5 +9,6 @@ show errors
 alter package arcsql compile body;
 show errors
 @arcsql_config.sql
+@arcsql_jobs.sql
 commit;
 
