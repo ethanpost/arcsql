@@ -2549,6 +2549,23 @@ begin
    debug('Set alert priority to '||g_alert_priority.priority_level);
 end;
 
+procedure raise_alert_priority_not_set is 
+begin 
+   if g_alert_priority.priority_level is null then 
+      raise_application_error(-20001, 'Alert priority not set.');
+   end if;
+end;
+
+procedure save_alert_priority is 
+begin 
+   raise_alert_priority_not_set;
+   if does_alert_priority_exist(g_alert_priority.priority_level) then 
+      update arcsql_alert_priority set row=g_alert_priority where priority_level=g_alert_priority.priority_level;
+   else 
+      insert into arcsql_alert_priority values g_alert_priority;
+   end if;
+end;
+
 function get_default_alert_priority return number is 
    cursor default_priorities is 
    select * from arcsql_alert_priority 
@@ -2646,7 +2663,10 @@ procedure close_alert (p_text in varchar2) is
    v_alert_key varchar2(120) := get_alert_key_from_alert_text(p_text);
 begin 
    set_alert(v_alert_key);
-   update arcsql_alert set closed=sysdate, status='closed'
+   update arcsql_alert 
+      set closed=sysdate, 
+          status='closed',
+          last_action=sysdate
     where alert_key=v_alert_key
       and status in ('open', 'abandoned');
    if not g_alert_priority.close_log_type is null and g_alert_priority.priority_level > 0 then
@@ -2660,7 +2680,10 @@ procedure abandon_alert (p_text in varchar2) is
    v_alert_key varchar2(120) := get_alert_key_from_alert_text(p_text);
 begin 
    set_alert(v_alert_key);
-   update arcsql_alert set abandoned=sysdate, status='abandoned'
+   update arcsql_alert 
+      set abandoned=sysdate, 
+          status='abandoned',
+          last_action=sysdate
     where alert_key=v_alert_key
       and status in ('open');
    if not g_alert_priority.abandon_log_type is null and g_alert_priority.priority_level > 0 then
@@ -2676,7 +2699,8 @@ begin
    set_alert(v_alert_key);
    update arcsql_alert 
       set reminder_interval=reminder_interval*g_alert_priority.reminder_backoff_interval,
-          reminder_count=reminder_count+1
+          reminder_count=reminder_count+1,
+          last_action=sysdate
     where alert_key=v_alert_key
       and status in ('open');
    log_alert (
@@ -2701,7 +2725,7 @@ begin
          abandon_alert(open_alert.alert_key);
       end if;
       if g_alert_priority.reminder_interval > 0 and 
-         open_alert.opened+(g_alert_priority.reminder_interval/1440) < sysdate and
+         open_alert.last_action+(g_alert_priority.reminder_interval/1440) < sysdate and
          open_alert.reminder_count < g_alert_priority.reminder_count and 
          open_alert.status = 'open' then 
          remind_alert(open_alert.alert_key);

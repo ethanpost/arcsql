@@ -312,6 +312,8 @@ create or replace package arcsql as
 
    procedure set_alert_priority (p_priority in number);
 
+   procedure save_alert_priority;
+
    -- Returns 3 if nothing is set.
    function get_default_alert_priority return number;
 
@@ -322,6 +324,8 @@ create or replace package arcsql as
       p_contact_groups in varchar2 default null);
 
    procedure close_alert (p_text in varchar2);
+
+   procedure check_alerts;
 
    /* 
    -----------------------------------------------------------------------------------

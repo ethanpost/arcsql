@@ -741,12 +741,12 @@ begin
       create table arcsql_alert_priority (
       priority_level number,
       priority_name varchar2(120),
-      alert_log_type varchar2(120),
+      alert_log_type varchar2(120) not null,
       -- Truthy values including cron expressions are allowed here.
-      enabled varchar2(60) default ''Y'',
+      enabled varchar2(60) default ''Y'' not null,
       -- Can be a truthy value including cron expression.
       is_default varchar2(120) default null,
-      reminder_log_type varchar2(120),
+      reminder_log_type varchar2(120) default null,
       -- In minutes.
       reminder_interval number default 0 not null,
       reminder_count number default 0 not null,
@@ -781,6 +781,7 @@ begin
       abandoned date default null,
       contact_groups varchar2(120),
       reminder_count number default 0,
+      last_action date default sysdate,
       reminder_interval number default 0
       )', false);
       execute_sql('alter table arcsql_alert add constraint pk_arcsql_alert primary key (alert_key, opened)', false);
