@@ -2718,13 +2718,11 @@ begin
       if g_alert_priority.close_interval > 0 and 
          open_alert.opened+(g_alert_priority.close_interval/1440) < sysdate then 
          close_alert(open_alert.alert_key);
-      end if;
-      if g_alert_priority.abandon_interval > 0 and 
+      elsif g_alert_priority.abandon_interval > 0 and 
          open_alert.opened+(g_alert_priority.abandon_interval/1440) < sysdate and 
          open_alert.status = 'open' then 
          abandon_alert(open_alert.alert_key);
-      end if;
-      if g_alert_priority.reminder_interval > 0 and 
+      elsif g_alert_priority.reminder_interval > 0 and 
          open_alert.last_action+(g_alert_priority.reminder_interval/1440) < sysdate and
          open_alert.reminder_count < g_alert_priority.reminder_count and 
          open_alert.status = 'open' then 
