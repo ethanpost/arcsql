@@ -710,6 +710,7 @@ end;
 /
 
 -- uninstall: drop table contact_group cascade constraints purge;
+drop table arcsql_contact_group;
 begin
    if not does_table_exist('arcsql_contact_group') then 
       execute_sql('
@@ -717,16 +718,18 @@ begin
       group_name varchar2(120),
       email_addresses varchar2(1000),
       sms_addresses varchar2(1000),
-      is_default varchar2(1) default ''Y'' not null,
       is_group_enabled varchar2(1) default ''Y'' not null,
       is_group_on_hold varchar2(1) default ''N'' not null,
-      is_sms_disabled varchar2(1) default ''Y'' not null,
+      is_sms_disabled varchar2(1) default ''N'' not null,
       -- Amount of time the oldest message can sit in the queue before sending all messages in the queue.
       max_queue_secs number default 0,
       -- The amount of time the most recent message can sit in the queue without a new message arriving before sending all of the messages in the queue.
       max_idle_secs number default 0,
       -- The maximum # of messages that the queue can hold before sending all of the messaged in the queue.
-      max_count number default 0
+      max_count number default 0,
+      last_checked date default sysdate not null,
+      -- You can create a custom view on arcsql_log to limit which messages this contact group monitors.
+      view_name varchar2(120)
       )', false);
       execute_sql('alter table arcsql_contact_group add constraint pk_arcsql_contact_group primary key (group_name)', false);
    end if;
@@ -764,12 +767,15 @@ begin
 end;
 /
 
+exec create_sequence('seq_arcsql_alert');
+
 -- uninstall: drop table arcsql_alert cascade constraints purge;
 drop table arcsql_alert;
 begin
    if not does_table_exist('arcsql_alert') then 
       execute_sql('
       create table arcsql_alert (
+      alert_id number default seq_arcsql_alert.nextval,
       -- Anything not in first set of [] will be used to formulate the alert_key.
       alert_text varchar2(120),
       -- Unique key parsed from alert_text.
@@ -783,7 +789,8 @@ begin
       last_action date default sysdate,
       reminder_interval number default 0
       )', false);
-      execute_sql('alter table arcsql_alert add constraint pk_arcsql_alert primary key (alert_key, opened)', false);
+      execute_sql('alter table arcsql_alert add constraint pk_arcsql_alert primary key (alert_id)', false);
+      execute_sql('create unique index arcsql_alert_1 on arcsql_alert (alert_key, opened)', false);
    end if;
 end;
 /

@@ -287,6 +287,11 @@ create or replace package arcsql as
       metric_name_2 in varchar2 default null,
       metric_2 in number default null);
 
+   procedure sms (
+   sms_text in varchar2, 
+   sms_key in varchar2 default null, 
+   sms_tags in varchar2 default null);
+   
    /* 
    -----------------------------------------------------------------------------------
    Contact Groups
@@ -295,7 +300,9 @@ create or replace package arcsql as
    
    g_contact_group arcsql_contact_group%rowtype;
    procedure set_contact_group (p_group_name in varchar2);
+   procedure send_email_messages;
    procedure raise_contact_group_not_set;
+   procedure check_contact_groups;
 
    /* 
    -----------------------------------------------------------------------------------
@@ -321,7 +328,9 @@ create or replace package arcsql as
       p_text in varchar2 default null,
       p_priority in number default null);
 
-   procedure close_alert (p_text in varchar2);
+   procedure close_alert (
+      p_text in varchar2, 
+      p_is_autoclose in boolean := false);
 
    procedure check_alerts;
 

@@ -1810,6 +1810,19 @@ begin
       p_metric_2=>metric_2);
 end;
 
+procedure sms (
+   sms_text in varchar2, 
+   sms_key in varchar2 default null, 
+   sms_tags in varchar2 default null) is 
+begin
+   log_interface(
+      p_text=>sms_text, 
+      p_key=>sms_key, 
+      p_tags=>sms_tags, 
+      p_level=>0, 
+      p_type=>'sms');
+end;
+
 /* 
 -----------------------------------------------------------------------------------
 Contact Groups
@@ -1818,8 +1831,7 @@ Contact Groups
 
 procedure set_contact_group (p_group_name in varchar2) is 
 begin 
-   select * into g_contact_group from arcsql_contact_group
-    where group_name=p_group_name;
+   select * into g_contact_group from arcsql_contact_group where group_name=p_group_name;
 end;
 
 procedure raise_contact_group_not_set is 
@@ -1827,6 +1839,193 @@ begin
    if g_contact_group.group_name is null then  
       raise_application_error(-20001, 'Contact group is not set.');
    end if;
+end;
+
+function is_sms_possible return boolean is 
+   n number;
+begin 
+   raise_contact_group_not_set;
+   select count(*) into n from arcsql_contact_group 
+    where group_name=g_contact_group.group_name 
+      and not sms_addresses is null 
+      and is_truthy_y(is_group_enabled)='y' 
+      and is_truthy_y(is_sms_disabled)='n'
+      and is_truthy_y(is_group_on_hold)='n';
+   if n > 0 then 
+      debug('is_sms_possible: true');
+      return true;
+   else 
+      debug('is_sms_possible: false');
+      return false;
+   end if;
+end;
+
+function is_email_possible return boolean is 
+   n number;
+begin 
+   raise_contact_group_not_set;
+   select count(*) into n from arcsql_contact_group 
+    where group_name=g_contact_group.group_name 
+      and not email_addresses is null 
+      and is_truthy_y(is_group_enabled)='y' 
+      and is_truthy_y(is_group_on_hold)='n';
+   if n > 0 then 
+      debug('is_email_possible: true');
+      return true;
+   else 
+      debug('is_email_possible: false');
+      return false;
+   end if;
+end;
+
+function has_sms_messages return boolean is 
+   n number;
+   sql_text varchar2(1000);
+begin
+   raise_contact_group_not_set;
+   sql_text := '
+   select count(*) 
+     from '||nvl(g_contact_group.view_name, 'arcsql_log')||' '||'
+     where log_time > :b1 and
+           log_type in (select log_type from arcsql_log_type where arcsql.is_truthy_y(sends_sms)=''y'')';
+   execute immediate sql_text into n using nvl(g_contact_group.last_checked, sysdate);
+   if n > 0 then 
+      debug('has_sms_messages: true');
+      return true;
+   else 
+      debug('has_sms_messages: false');
+      return false;
+   end if;
+end;
+
+function has_email_messages return boolean is 
+   n number;
+   sql_text varchar2(1000);
+begin
+   raise_contact_group_not_set;
+   sql_text := '
+   select count(*) 
+     from '||nvl(g_contact_group.view_name, 'arcsql_log')||' '||'
+     where log_time > :b1 and
+           log_type in (select log_type from arcsql_log_type where arcsql.is_truthy_y(sends_email)=''y'')';
+   execute immediate sql_text into n using nvl(g_contact_group.last_checked, sysdate);
+   if n > 0 then 
+      debug('has_email_messages: true');
+      return true;
+   else 
+      debug('has_email_messages: false');
+      return false;
+   end if;
+end;
+
+procedure send_sms_messages is 
+   type ctype is ref cursor;
+   c ctype;
+   n arcsql_log%rowtype;
+begin 
+   debug('Entering send_sms_messages.');
+   raise_contact_group_not_set;
+   open c for '
+   select * from '||nvl(g_contact_group.view_name, 'arcsql_log')||'
+    where log_time > :b1 and
+          log_type not like ''debug%'' and 
+          log_type in (select log_type from arcsql_log_type 
+                        where arcsql.is_truthy_y(sends_sms)=''y'')' using g_contact_group.last_checked;
+   loop
+      fetch c into n;
+         exit when c%notfound;
+         arcsql.debug('send_sms_messages: '||n.log_entry);
+   end loop;
+   update arcsql_contact_group set last_checked=sysdate where group_name=g_contact_group.group_name;
+   commit;
+end;
+
+procedure send_email_messages is 
+   type ctype is ref cursor;
+   c ctype;
+   n arcsql_log%rowtype;
+begin 
+   debug('Entering send_email_messages.');
+   raise_contact_group_not_set;
+   open c for '
+   select * from '||nvl(g_contact_group.view_name, 'arcsql_log')||'
+    where log_time > :b1 and
+          log_type not like ''debug%'' and 
+          log_type in (select log_type from arcsql_log_type 
+                        where arcsql.is_truthy_y(sends_email)=''y'' or 
+                              arcsql.is_truthy_y(sends_sms)=''y'')' using g_contact_group.last_checked;
+   loop
+      fetch c into n;
+         exit when c%notfound;
+         arcsql.debug('send_email_messages: '||n.log_entry);
+   end loop;
+   update arcsql_contact_group set last_checked=sysdate where group_name=g_contact_group.group_name;
+   commit;
+end;
+
+procedure check_contact_groups is 
+   cursor contact_groups is 
+   select * from arcsql_contact_group;
+
+   function is_max_queue_secs return boolean is 
+      v_queue_secs number;
+   begin 
+      select round((sysdate-min(log_time))/1440)
+        into v_queue_secs
+        from arcsql_log 
+       where log_time > g_contact_group.last_checked;
+      if v_queue_secs >= g_contact_group.max_queue_secs then 
+         debug('is_max_queue_secs: true');
+         return true;
+      else 
+         debug('is_max_queue_secs: false');
+         return false;
+      end if;
+   end;
+
+   function is_max_idle_secs return boolean is 
+      v_idle_secs number;
+   begin 
+      select round((sysdate-max(log_time))/1440)
+        into v_idle_secs
+        from arcsql_log 
+       where log_time > g_contact_group.last_checked;
+      if v_idle_secs >= g_contact_group.max_idle_secs then 
+         debug('is_max_idle_secs: true');
+         return true;
+      else 
+         debug('is_max_idle_secs: false');
+         return false;
+      end if;
+   end;
+
+   function is_max_count return boolean is 
+      v_count number;
+   begin 
+      select count(*)
+        into v_count
+        from arcsql_log 
+       where log_time > g_contact_group.last_checked;
+      if v_count >= g_contact_group.max_count then 
+         debug('is_max_count: true');
+         return true;
+      else 
+         debug('is_max_count: false');
+         return false;
+      end if;
+   end;
+
+begin 
+   for contact_group in contact_groups loop 
+      set_contact_group(contact_group.group_name);
+      debug('Checking contact group '||contact_group.group_name);
+      if is_sms_possible and has_sms_messages then 
+         send_sms_messages;
+         send_email_messages;
+      elsif is_email_possible and has_email_messages and (is_max_queue_secs or is_max_idle_secs or is_max_count) then
+         send_email_messages;
+      end if;
+   end loop;
 end;
 
 /* 
@@ -2558,24 +2757,33 @@ begin
    end if;
 end;
 
+procedure raise_alert_priority_not_found (p_priority in number) is 
+   n number;
+begin 
+   select count(*) into n from arcsql_alert_priority where priority_level=p_priority;
+   if n = 0 then 
+      raise_application_error(-20001, 'Alert priority not found.');
+   end if;
+end;
+
 procedure set_alert_priority (p_priority in number) is 
    n number;
 begin 
+   raise_alert_priority_not_found(p_priority);
    -- Get the max level alert type which is enabled.
    g_alert_priority := null;
    select max(priority_level) into n 
      from arcsql_alert_priority 
     where priority_level <= p_priority 
       and is_truthy_y(enabled) = 'y';
-   if nvl(n, 0) > 0 then 
+   if n is null then 
+      g_alert_priority.priority_level := 0;
+   else 
       select * into g_alert_priority
         from arcsql_alert_priority 
        where priority_level=n;
-   else 
-      -- If no alert types are enabled we still will need some values here.
-      g_alert_priority.priority_level := 0;
    end if;
-   debug3('Set alert priority to '||g_alert_priority.priority_level);
+   debug3('Setting alert priority level to '||g_alert_priority.priority_level);
 end;
 
 procedure raise_alert_priority_not_set is 
@@ -2630,7 +2838,7 @@ begin
    raise_alert_not_set;
    log_interface (
       p_text=>p_log_text, 
-      p_key=>'P'||g_alert.priority_level||' Alert', 
+      p_key=>'ALERT-P'||g_alert.priority_level, 
       p_tags=>'alert',
       p_level=>0, 
       p_type=>p_log_type);
@@ -2679,14 +2887,17 @@ begin
             );
          set_alert(v_alert_key);
          log_alert (
-            p_log_text=>'Opening P'||g_alert_priority.priority_level||' Alert: '||p_text,
+            p_log_text=>'OPEN: '||p_text||' (ALERT-P'||g_alert_priority.priority_level||')',
             p_log_type=>g_alert_priority.alert_log_type);
       end if;
    end if;
 end;
 
-procedure close_alert (p_text in varchar2) is 
+procedure close_alert (
+   p_text in varchar2, 
+   p_is_autoclose in boolean := false) is 
    v_alert_key varchar2(120) := get_alert_key_from_alert_text(p_text);
+   v_close varchar2(120) := 'CLOSE';
 begin 
    set_alert(v_alert_key);
    update arcsql_alert 
@@ -2696,8 +2907,11 @@ begin
     where alert_key=v_alert_key
       and status in ('open', 'abandoned');
    if not g_alert_priority.close_log_type is null and g_alert_priority.priority_level > 0 then
+      if p_is_autoclose then 
+         v_close := 'AUTOCLOSE';
+      end if;
       log_alert (
-         p_log_text=>'Closing P'||g_alert_priority.priority_level||' Alert: '||p_text,
+         p_log_text=>v_close||': '||p_text||' (ALERT-P'||g_alert_priority.priority_level||')',
          p_log_type=>g_alert_priority.alert_log_type);
    end if;
 end;
@@ -2714,7 +2928,7 @@ begin
       and status in ('open');
    if not g_alert_priority.abandon_log_type is null and g_alert_priority.priority_level > 0 then
       log_alert (
-         p_log_text=>'Abandoning P'||g_alert_priority.priority_level||' Alert: '||p_text,
+         p_log_text=>'ABANDON: '||p_text||' (ALERT-P'||g_alert_priority.priority_level||')',
          p_log_type=>g_alert_priority.alert_log_type);
    end if;
 end;
@@ -2730,7 +2944,7 @@ begin
     where alert_key=v_alert_key
       and status in ('open');
    log_alert (
-      p_log_text=>'Reminder P'||g_alert_priority.priority_level||' Alert: '||p_text,
+      p_log_text=>'REMIND: '||p_text||' (ALERT-P'||g_alert_priority.priority_level||')',
       p_log_type=>g_alert_priority.alert_log_type);
 end;
 
