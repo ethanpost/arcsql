@@ -1014,7 +1014,7 @@ procedure sql_log_take_snapshot is
    -- later be compared back to the current values in the view.
    n number;
 begin
-   n := to_number(nvl(arcsql.get_config('sql_log_sql_text_length'), '100'));
+   n := to_number(arcsql.get_setting('sql_log_sql_text_length'));
    insert into sql_snap (
       sql_id,
       insert_datetime,
@@ -1476,7 +1476,7 @@ Purge records from audsid_event that are older than 4 hours.
 */
    v_hours number;
 begin
-   v_hours := nvl(arcsql.get_config('purge_event_hours'), 4);
+   v_hours := get_setting('purge_event_hours');
    delete from audsid_event where start_time < sysdate-v_hours/24;
 end;
 

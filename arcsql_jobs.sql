@@ -13,6 +13,20 @@ begin
 end;
 /
 
+-- uninstall: exec dbms_scheduler.drop_job('arcsql_purge_events');
+begin
+  if not does_scheduler_job_exist('arcsql_purge_events') then 
+     dbms_scheduler.create_job (
+       job_name        => 'arcsql_purge_events',
+       job_type        => 'PLSQL_BLOCK',
+       job_action      => 'begin arcsql.purge_events; end;',
+       start_date      => systimestamp,
+       repeat_interval => 'freq=hourly;interval=1',
+       enabled         => true);
+   end if;
+end;
+/
+
 -- uninstall: exec dbms_scheduler.drop_job('arcsql_check_alerts');
 begin
   if not does_scheduler_job_exist('arcsql_check_alerts') then 
