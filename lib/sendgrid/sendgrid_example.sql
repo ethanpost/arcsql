@@ -15,9 +15,9 @@ commit;
 begin 
    arcsql.log_level := 1;
    sendgrid.send(
-      to_address=>'post.ethan@gmail.com', 
-      subject=>'How do you like SendGrid?', 
-      message=>'Hey Ethan, just checking in.');
+      p_to=>'post.ethan@gmail.com', 
+      p_subject=>'How do you like SendGrid?', 
+      p_body=>'Hey Ethan, just checking in.');
 end;
 /
 select * from arcsql_log order by 1 desc;
