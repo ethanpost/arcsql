@@ -144,7 +144,10 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
+   -- Returns value for setting. Looks in arcsql_config table, 
+   -- arcsql_private_settings package, and then arcsql_public_settings package.
    function get_setting(setting_name varchar2) return varchar2 deterministic;
+   
    -- Add a config setting. Forced to lcase. If already exists nothing happens.
    procedure add_config (name varchar2, value varchar2, description varchar2 default null);
    -- Update a config setting. Created if it doesn't exist.

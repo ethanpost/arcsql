@@ -25,6 +25,11 @@ begin
       select count(*) into n 
         from user_constraints
        where constraint_name=upper(does_object_exist.object_name);
+   elsif upper(does_object_exist.object_type) = 'PACKAGE' then
+      select count(*) into n 
+        from all_source 
+       where name=upper(does_object_exist.object_name) 
+         and type='PACKAGE';
    else
       select count(*) into n 
         from user_objects 
@@ -39,6 +44,26 @@ begin
 end;
 /
 
+-- uninstall: drop function does_package_exist;
+create or replace function does_package_exist (package_name in varchar2) return boolean is 
+begin 
+  if does_object_exist(does_package_exist.package_name, 'PACKAGE') then
+      return true;
+   else
+      return false;
+   end if;
+end;
+/
+
+-- uninstall: drop procedure drop_package;
+create or replace procedure drop_package (package_name in varchar2) is 
+begin 
+   if does_package_exist(drop_package.package_name) then 
+      execute_sql('drop package '||drop_package.package_name);
+   end if;
+end;
+/
+
 -- uninstall: drop function does_table_exist;
 create or replace function does_table_exist (table_name varchar2) return boolean is
 begin
@@ -47,9 +72,6 @@ begin
    else
       return false;
    end if;
-exception
-when others then
-   raise;
 end;
 /
 
