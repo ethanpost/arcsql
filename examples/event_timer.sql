@@ -19,7 +19,7 @@ are instrumenting and that acceptable.
 
 * A regularly scheduled purge is run to remove orphans in audsid_event
 table. Orphans are created by calling start without calling stop. The default
-value is 4 hours old. There is a setting in config_settings to change this.
+value is 4 hours old. There is a setting in arcsql_config to change this.
 
 * If start_event is called again before calling stop no error is returned.
 The new start time is recorded. I will be adding some ability to see misses

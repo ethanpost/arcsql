@@ -675,23 +675,23 @@ end;
 
 procedure remove_config (name varchar2) is
 begin
-   delete from config_settings where name=remove_config.name;
+   delete from arcsql_config where name=remove_config.name;
 end;
 
 procedure add_config (name varchar2, value varchar2, description varchar2 default null) is
 begin
    -- DO NOT MODIFY IF EXISTS! Update to self.
-   update config_settings set value=value where name=lower(add_config.name);
+   update arcsql_config set value=value where name=lower(add_config.name);
    -- If nothing happened we need to add it.
    if sql%rowcount = 0 then
-      insert into config_settings (name, value, description)
+      insert into arcsql_config (name, value, description)
         values (lower(add_config.name), add_config.value, description);
    end if;
 end;
 
 procedure set_config (name varchar2, value varchar2) is
 begin
-   update config_settings set value=set_config.value where name=lower(set_config.name);
+   update arcsql_config set value=set_config.value where name=lower(set_config.name);
    if sql%rowcount = 0 then
       add_config(set_config.name, set_config.value);
    end if;
@@ -700,7 +700,7 @@ end;
 function get_config (name varchar2) return varchar2 is
    config_value varchar2(1000);
 begin
-   select value into config_value from config_settings where name=lower(get_config.name);
+   select value into config_value from arcsql_config where name=lower(get_config.name);
    return config_value;
 exception
    when no_data_found then

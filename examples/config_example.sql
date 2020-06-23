@@ -1,4 +1,5 @@
 
+-- Video: https://youtu.be/qN5rJ6zmi2k
 
 -- Drop our private package to start things off.
 exec drop_package('arcsql_private_settings');

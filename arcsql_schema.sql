@@ -10,11 +10,11 @@ create or replace function arcsql_version return number is
    n number;
    s varchar2(100);
 begin 
-   select count(*) into n from user_tables where table_name='CONFIG_SETTINGS';
+   select count(*) into n from user_tables where table_name='ARCSQL_CONFIG';
    if n = 0 then
       return 0;
    else 
-      execute immediate 'select max(value) from config_settings where name=''arcsql_version''' into s;
+      execute immediate 'select max(value) from arcsql_config where name=''arcsql_version''' into s;
       if s is null then 
          return 0;
       else 
@@ -120,20 +120,18 @@ begin
 end;
 /
 
-/* CUSTOM CONFIG SETTINGS */
-
--- uninstall: drop table config_settings;
+-- uninstall: drop table arcsql_config;
 begin
-   if not does_table_exist('config_settings') then
+   if not does_table_exist('arcsql_config') then
    
       execute_sql('
-      create table config_settings (
+      create table arcsql_config (
       name varchar2(100),
       value varchar2(1000),
       description varchar2(1000))', false);
       
       execute_sql('
-      create unique index config_settings_1 on config_settings (name)', true);
+      create unique index arcsql_config_1 on arcsql_config (name)', true);
       
    end if;
 end;

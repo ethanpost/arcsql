@@ -24,7 +24,7 @@ grant select on dba_users to &username;
 
 -- Used for SQL_LOG.
 grant select on gv$sql to &username;
--- Only used if licensed and explicitly specified in the config_settings table.
+-- Only used if licensed and explicitly specified in the arcsql_config table.
 grant select on gv$active_session_history to &username;
 
 -- Used to generate random numbers and strings.

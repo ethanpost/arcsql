@@ -28,7 +28,7 @@ exec arcsql.stop;
 
 exec arcsql.run;
 
-select * from config_settings;
+select * from arcsql_config;
 
 select greatest(null, 3) from dual;
 
