@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+cp /dev/null ./arcsql_uninstall.sql
 grep "^@" arcsql_install.sql | sed 's/^@/\.\//' | \
 while read file_name; do 
    echo "grep \"^\-\- uninstall:\" \"${file_name}\""
