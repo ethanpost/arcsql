@@ -153,12 +153,14 @@ exception
 end;
 /
 
+-- uninstall: drop procedure drop_sequence;
 create or replace procedure drop_sequence (sequence_name varchar2) is 
 begin  
     drop_object(sequence_name, 'SEQUENCE');
 end;
 /
 
+-- uninstall: drop procedure create_sequence;
 create or replace procedure create_sequence (sequence_name in varchar2) is 
 begin
    if not does_sequence_exist(sequence_name) then
@@ -167,6 +169,7 @@ begin
 end;
 /
 
+-- uninstall: drop function does_scheduler_job_exist;
 create or replace function does_scheduler_job_exist (p_job_name in varchar2) return boolean is
    n number;
 begin 
@@ -181,6 +184,7 @@ end;
 /
 
 -- Needs to be a standalong func here and not in arcsql package becuase authid current user is used.
+-- uninstall: drop function num_get_val_from_sql;
 create or replace function num_get_val_from_sql(sql_text in varchar2) return number authid current_user is 
    n number;
 begin
@@ -189,6 +193,7 @@ begin
 end;
 /
 
+-- uninstall: drop function does_database_account_exist;
 create or replace function does_database_account_exist (username varchar2) return boolean is 
    n number;
 begin

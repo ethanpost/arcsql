@@ -208,6 +208,29 @@ begin
    return true;
 end;
 
+procedure str_raise_complex_value (
+   text varchar2, 
+   allow_regex varchar2 default null) is 
+   -- Raise error if value exceeds max len or contains anything but A-z, 0-9, and _(s).
+   m varchar2(120);
+   max_len number := 1000;
+   s varchar2(1000);
+begin 
+   if length(text) > max_len then 
+      m := 'Value is too long.';
+      raise_application_error(-20001, m);
+   end if;
+   if allow_regex is not null then 
+      s := regexp_replace(text, allow_regex);
+   else 
+      s := text;
+   end if;
+   m := 'Value contains invalid characters.';
+   if regexp_replace(s, '[^0-9A-Za-z_]', '') != s then 
+      raise_application_error(-20001, m);
+   end if;
+end;
+
 function str_remove_text_between (
    p_text in varchar2,
    p_left_char in varchar2,
@@ -615,6 +638,40 @@ end;
 Configuration
 -----------------------------------------------------------------------------------
 */
+
+function get_setting(setting_name varchar2) return varchar2 deterministic is 
+   v varchar2(1000) := null;
+   x varchar2(1000) := null;
+   s varchar2(1000);
+   v_setting_name varchar2(120) := lower(setting_name);
+begin 
+   str_raise_complex_value(v_setting_name);
+   v := get_config(v_setting_name);
+   if not v is null then 
+      return v;
+   end if;
+   s := 'begin :x := arcsql_private_settings.'||setting_name||'; end;';
+   begin 
+      execute immediate s using out v;
+      if not v is null then 
+         return v;
+      end if;
+   exception
+      when others then 
+         null;
+   end;
+   s := 'begin :x := arcsql_public_settings.'||setting_name||'; end;';
+   begin 
+      execute immediate s using out v;
+      if not v is null then 
+         return v;
+      end if;
+   exception
+      when others then 
+         null;
+   end;
+   raise_application_error(-20001,'get_setting: '||setting_name||' not found.');
+end;
 
 procedure remove_config (name varchar2) is
 begin

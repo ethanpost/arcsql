@@ -1,3 +1,5 @@
+
+-- uninstall: drop package arcsql;
 create or replace package arcsql as
 
    /* 
@@ -51,6 +53,10 @@ create or replace package arcsql as
        lowercase  integer := null,
        digit      integer := null,
        special    integer := null) return boolean;
+
+   procedure str_raise_complex_value (
+      text varchar2, 
+      allow_regex varchar2 default null);
 
    function str_remove_text_between (
       p_text in varchar2,
@@ -138,6 +144,7 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
+   function get_setting(setting_name varchar2) return varchar2 deterministic;
    -- Add a config setting. Forced to lcase. If already exists nothing happens.
    procedure add_config (name varchar2, value varchar2, description varchar2 default null);
    -- Update a config setting. Created if it doesn't exist.
@@ -145,7 +152,7 @@ create or replace package arcsql as
    -- Remove a config setting. 
    procedure remove_config (name varchar2);
    -- Return the config value. Returns null if it does not exist.
-   function  get_config (name varchar2)  return varchar2;
+   function get_config (name varchar2)  return varchar2;
 
    /* 
    -----------------------------------------------------------------------------------
