@@ -2761,6 +2761,52 @@ end;
 
 /* 
 -----------------------------------------------------------------------------------
+Sensor
+-----------------------------------------------------------------------------------
+*/
+
+function sensor (
+   p_key in varchar2,
+   p_input in varchar2,
+   p_fail_count in number default 0) return boolean is 
+begin 
+   update arcsql_sensor 
+      set matches=decode(p_input, new_value, 'Y', 'N'),
+          old_value=new_value,
+          new_value=p_input,
+          old_updated=new_updated,
+          new_updated=sysdate,
+          fail_count=fail_count+decode(p_input, new_value, 0, 1)
+    where sensor_key=p_key;
+   if sql%rowcount = 0 then 
+      insert into arcsql_sensor (
+         sensor_key,
+         old_value,
+         new_value,
+         old_updated,
+         new_updated,
+         matches,
+         fail_count) values (
+         p_key,
+         p_input,
+         p_input,
+         sysdate,
+         sysdate,
+         'Y',
+         0);
+      commit;
+      return false;
+   end if;
+   select * into g_sensor from arcsql_sensor where sensor_key=p_key;
+   if g_sensor.matches = 'Y' then 
+      return true;
+   else 
+      return false;
+   end if;
+end;
+
+/* 
+-----------------------------------------------------------------------------------
 Messaging
 -----------------------------------------------------------------------------------
 */

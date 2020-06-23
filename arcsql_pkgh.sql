@@ -369,6 +369,7 @@ create or replace package arcsql as
 
    -- Stores the current app test profile.
    g_app_test_profile app_test_profile%rowtype;
+
    -- Stores the current app test record.
    g_app_test app_test%rowtype;
 
@@ -395,9 +396,11 @@ create or replace package arcsql as
    procedure set_app_test_profile (
       p_profile_name in varchar2 default null,
       p_env_type in varchar2 default null);
+
    procedure reset_app_test_profile;
 
    procedure save_app_test_profile;
+
    procedure save_app_test;
 
    function does_app_test_profile_exist (
@@ -407,12 +410,27 @@ create or replace package arcsql as
    function init_app_test (p_test_name varchar2) return boolean;
 
    procedure app_test_fail(p_message in varchar2 default null);
+
    procedure app_test_pass;
+
    procedure app_test_done;
 
    function cron_match (
       p_expression in varchar2,
       p_datetime in date default sysdate) return boolean;
+
+   /* 
+   -----------------------------------------------------------------------------------
+   Sensor
+   -----------------------------------------------------------------------------------
+   */
+
+   g_sensor arcsql_sensor%rowtype;
+
+   function sensor (
+      p_key in varchar2,
+      p_input in varchar2,
+      p_fail_count in number default 0) return boolean;
 
    /* 
    -----------------------------------------------------------------------------------

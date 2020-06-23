@@ -31,6 +31,12 @@ begin
    end if;
 end;
 
+procedure check_for_basic_changes_to_phys_db is 
+   s varchar2(2000);
+begin 
+   select listagg(tablespace_name, ',') within group (order by tablespace_name) from dba_tablespaces;
+end;
+
 procedure run_tests is 
 begin 
    add_app_profiles;

@@ -792,3 +792,22 @@ begin
    end if;
 end;
 /
+
+-- uninstall: drop table arcsql_sensor cascade constraints purge;
+drop table arcsql_sensor;
+begin
+   if not does_table_exist('arcsql_sensor') then 
+      execute_sql('
+      create table arcsql_sensor (
+      sensor_key varchar2(120),
+      new_value varchar2(2000),
+      old_value varchar2(2000),
+      new_updated date default sysdate,
+      old_updated date default sysdate,
+      matches varchar2(1) default ''Y'',
+      fail_count number default 0
+      )', false);
+      execute_sql('alter table arcsql_sensor add constraint pk_arcsql_sensor primary key (sensor_key)', false);
+   end if;
+end;
+/
