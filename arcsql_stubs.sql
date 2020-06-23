@@ -12,6 +12,6 @@ end;
 
 -- uninstall: drop package arcsql_private_settings;
 create or replace package arcsql_private_settings as 
-   null;
+   foo number;
 end;
 /
