@@ -68,3 +68,5 @@ exec drop_table('sensor_test');
 exec sensor_example;
 
 select * from arcsql_log order by 1 desc;
+
+drop procedure sensor_example;

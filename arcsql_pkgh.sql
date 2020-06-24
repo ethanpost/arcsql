@@ -238,6 +238,16 @@ create or replace package arcsql as
       log_text in varchar2, 
       log_key in varchar2 default null, 
       log_tags in varchar2 default null,
+      log_type in varchar2 default 'log',
+      metric_name_1 in varchar2 default null,
+      metric_1 in number default null,
+      metric_name_2 in varchar2 default null,
+      metric_2 in number default null);
+
+   procedure notify (
+      notify_text in varchar2, 
+      notify_key in varchar2 default null, 
+      notify_tags in varchar2 default null,
       metric_name_1 in varchar2 default null,
       metric_1 in number default null,
       metric_name_2 in varchar2 default null,

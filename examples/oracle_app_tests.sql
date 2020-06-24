@@ -31,10 +31,28 @@ begin
    end if;
 end;
 
-procedure check_for_basic_changes_to_phys_db is 
+procedure check_for_db_changes is 
    s varchar2(2000);
 begin 
-   select listagg(tablespace_name, ',') within group (order by tablespace_name) from dba_tablespaces;
+   
+   select listagg(dbid||' '||name, ',') within group (order by dbid||' '||name) 
+     into s 
+     from gv$database;
+   if arcsql.sensor (
+      p_key=>'database_list',
+      p_input=>s) then 
+      arcsql.notify(g_sensor.sensor_message);
+   end if;
+   
+   select listagg(tablespace_name, ',') within group (order by tablespace_name) 
+     into s
+     from dba_tablespaces;
+   if arcsql.sensor (
+      p_key=>'tablespace_list',
+      p_input=>s) then 
+      arcsql.notify(g_sensor.sensor_message);
+   end if;
+
 end;
 
 procedure run_tests is 
@@ -45,6 +63,4 @@ end;
 
 end;
 /
-
-exec arcsql.add_task(task_text=>'oracle_app_tests.run_tests', 'run_every_min');
 

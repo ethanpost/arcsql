@@ -1724,6 +1724,7 @@ procedure log (
    log_text in varchar2, 
    log_key in varchar2 default null, 
    log_tags in varchar2 default null,
+   log_type in varchar2 default 'log',
    metric_name_1 in varchar2 default null,
    metric_1 in number default null,
    metric_name_2 in varchar2 default null,
@@ -1734,7 +1735,28 @@ begin
       p_key=>log_key, 
       p_tags=>log_tags, 
       p_level=>0, 
-      p_type=>'log',
+      p_type=>log_type,
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+procedure notify (
+   notify_text in varchar2, 
+   notify_key in varchar2 default null, 
+   notify_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>notify_text, 
+      p_key=>notify_key, 
+      p_tags=>notify_tags, 
+      p_level=>0, 
+      p_type=>'notify',
       p_metric_name_1=>metric_name_1,
       p_metric_1=>metric_1,
       p_metric_name_2=>metric_name_2,
@@ -2798,10 +2820,15 @@ begin
       return false;
    end if;
    select * into g_sensor from arcsql_sensor where sensor_key=p_key;
-   if g_sensor.matches = 'N' then 
-      return true;
-   else 
+   if g_sensor.matches = 'Y' then 
       return false;
+   else 
+      g_sensor.sensor_message := 'Sensor detected change in '''||g_sensor.sensor_key||'''.
+Old value: '||g_sensor.old_value||'
+New value :'||g_sensor.new_value;
+      update arcsql_sensor set sensor_message=g_sensor.sensor_message where sensor_key=p_key;
+      commit;
+      return true;
    end if;
 end;
 

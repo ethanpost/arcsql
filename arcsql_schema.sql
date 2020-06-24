@@ -805,7 +805,8 @@ begin
       new_updated date default sysdate,
       old_updated date default sysdate,
       matches varchar2(1) default ''Y'',
-      fail_count number default 0
+      fail_count number default 0,
+      sensor_message varchar2(2000)
       )', false);
       execute_sql('alter table arcsql_sensor add constraint pk_arcsql_sensor primary key (sensor_key)', false);
    end if;
