@@ -251,7 +251,7 @@ create or replace package arcsql as
       metric_name_2 in varchar2 default null,
       metric_2 in number default null);
 
-   procedure notify (
+   procedure log_notify (
       notify_text in varchar2, 
       notify_key in varchar2 default null, 
       notify_tags in varchar2 default null,
@@ -260,7 +260,7 @@ create or replace package arcsql as
       metric_name_2 in varchar2 default null,
       metric_2 in number default null);
 
-   procedure audit (
+   procedure log_audit (
       audit_text in varchar2, 
       audit_key in varchar2 default null, 
       audit_tags in varchar2 default null,
@@ -269,7 +269,7 @@ create or replace package arcsql as
       metric_name_2 in varchar2 default null,
       metric_2 in number default null);
 
-   procedure err (
+   procedure log_err (
       error_text in varchar2, 
       error_key in varchar2 default null, 
       error_tags in varchar2 default null,
@@ -305,7 +305,7 @@ create or replace package arcsql as
       metric_name_2 in varchar2 default null,
       metric_2 in number default null);
 
-   procedure fail (
+   procedure log_fail (
       fail_text in varchar2, 
       fail_key in varchar2 default null, 
       fail_tags in varchar2 default null,
@@ -314,10 +314,15 @@ create or replace package arcsql as
       metric_name_2 in varchar2 default null,
       metric_2 in number default null);
 
-   procedure sms (
-   sms_text in varchar2, 
-   sms_key in varchar2 default null, 
-   sms_tags in varchar2 default null);
+   procedure log_sms (
+      sms_text in varchar2, 
+      sms_key in varchar2 default null, 
+      sms_tags in varchar2 default null);
+
+    procedure log_email (
+      email_text in varchar2, 
+      email_key in varchar2 default null, 
+      email_tags in varchar2 default null);
    
    /* 
    -----------------------------------------------------------------------------------

@@ -1797,7 +1797,7 @@ begin
       p_metric_2=>metric_2);
 end;
 
-procedure notify (
+procedure log_notify (
    notify_text in varchar2, 
    notify_key in varchar2 default null, 
    notify_tags in varchar2 default null,
@@ -1818,7 +1818,7 @@ begin
       p_metric_2=>metric_2);
 end;
 
-procedure audit (
+procedure log_audit (
    audit_text in varchar2, 
    audit_key in varchar2 default null, 
    audit_tags in varchar2 default null,
@@ -1839,7 +1839,7 @@ begin
       p_metric_2=>metric_2);
 end;
 
-procedure err (
+procedure log_err (
    error_text in varchar2, 
    error_key in varchar2 default null, 
    error_tags in varchar2 default null,
@@ -1923,7 +1923,7 @@ begin
       p_metric_2=>metric_2);
 end;
 
-procedure fail (
+procedure log_fail (
    fail_text in varchar2, 
    fail_key in varchar2 default null, 
    fail_tags in varchar2 default null,
@@ -1944,7 +1944,7 @@ begin
       p_metric_2=>metric_2);
 end;
 
-procedure sms (
+procedure log_sms (
    sms_text in varchar2, 
    sms_key in varchar2 default null, 
    sms_tags in varchar2 default null) is 
@@ -1955,6 +1955,19 @@ begin
       p_tags=>sms_tags, 
       p_level=>0, 
       p_type=>'sms');
+end;
+
+procedure log_email (
+   email_text in varchar2, 
+   email_key in varchar2 default null, 
+   email_tags in varchar2 default null) is 
+begin
+   log_interface(
+      p_text=>email_text, 
+      p_key=>email_key, 
+      p_tags=>email_tags, 
+      p_level=>0, 
+      p_type=>'email');
 end;
 
 /* 
@@ -2187,10 +2200,10 @@ begin
       dbms_output.put_line('passed: '||arcsql.test_name);
    elsif test_passed = 0 then 
       dbms_output.put_line('failed: '||arcsql.test_name);
-      arcsql.fail(arcsql.test_name);
+      arcsql.log_fail(arcsql.test_name);
    elsif assert_true != true or assert_false != false or assert != true then
       dbms_output.put_line('failed: '||arcsql.test_name);
-      arcsql.fail(arcsql.test_name);
+      arcsql.log_fail(arcsql.test_name);
    else 
       dbms_output.put_line('passed: '||arcsql.test_name);
    end if;

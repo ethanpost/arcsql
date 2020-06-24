@@ -77,7 +77,7 @@ begin
    arcsql.debug2(sendgrid.sendgrid_api_url||' response: '||response);
 exception
    when others then 
-      arcsql.err(error_text=>'sendgrid.send: '||dbms_utility.format_error_stack);
+      arcsql.log_err(error_text=>'sendgrid.send: '||dbms_utility.format_error_stack);
       raise;
 end;
 
