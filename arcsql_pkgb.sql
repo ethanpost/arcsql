@@ -2798,7 +2798,7 @@ begin
       return false;
    end if;
    select * into g_sensor from arcsql_sensor where sensor_key=p_key;
-   if g_sensor.matches = 'Y' then 
+   if g_sensor.matches = 'N' then 
       return true;
    else 
       return false;
