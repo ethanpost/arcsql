@@ -133,8 +133,15 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
+   -- Cache a string.
    procedure cache (cache_key varchar2, p_value varchar2);
-   function return_cached_value (cache_key varchar2) return varchar2;
+   -- Specifically cache a date.
+   procedure cache_date (cache_key in varchar2, p_date in date);
+   -- Specifically cach a number.
+   procedure cache_num (cache_key in varchar2, p_num in number);
+   function get_cache (cache_key varchar2) return varchar2;
+   function get_cache_date (cache_key varchar2) return date;
+   function get_cache_num (cache_key varchar2) return number;
    function does_cache_key_exist (cache_key varchar2) return boolean;
    procedure delete_cache_key (cache_key varchar2);
 
@@ -436,6 +443,10 @@ create or replace package arcsql as
    */
 
    g_sensor arcsql_sensor%rowtype;
+
+   procedure set_sensor (p_key in varchar2);
+
+   function does_sensor_exist (p_key in varchar2) return boolean;
 
    function sensor (
       p_key in varchar2,

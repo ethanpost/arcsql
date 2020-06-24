@@ -105,17 +105,19 @@ create or replace view lock_time as (
 
 /* SIMPLE KEY VALUE DATASTORE */
 
--- uninstall: drop table cache;
+-- uninstall: drop table arcsql_cache;
 begin
-   if not does_table_exist('cache') then
+   if not does_table_exist('arcsql_cache') then
       execute_sql('
-      create table cache (
+      create table arcsql_cache (
       key         varchar2(200),
       value       varchar2(4000) default null,
+      date_value  date default null,
+      num_value   number default null,
       update_time date default sysdate)', false);
 
       execute_sql('
-      alter table cache add constraint pk_cache primary key (key)', false);
+      alter table arcsql_cache add constraint pk_arcsql_cache primary key (key)', false);
    end if;
 end;
 /
@@ -800,9 +802,9 @@ begin
       execute_sql('
       create table arcsql_sensor (
       sensor_key varchar2(120),
-      new_value varchar2(2000),
-      old_value varchar2(2000),
-      new_updated date default sysdate,
+      input varchar2(2000),
+      old_input varchar2(2000),
+      updated date default sysdate,
       old_updated date default sysdate,
       matches varchar2(1) default ''Y'',
       fail_count number default 0,

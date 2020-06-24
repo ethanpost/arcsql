@@ -589,35 +589,90 @@ procedure cache (
 begin
 
    if not does_cache_key_exist(cache_key) then
-      insert into cache (key) values (cache_key);
+      insert into arcsql_cache (key) values (cache_key);
    end if;
 
    if length(p_value) > 4000 then
       l_value := substr(p_value, 1, 4000);
    end if;
 
-   update cache 
+   update arcsql_cache 
       set value=p_value,
           update_time=sysdate
     where key=lower(cache_key);
 end;
 
-function return_cached_value (cache_key in varchar2) return varchar2 is 
+procedure cache_date (
+   cache_key varchar2, 
+   p_date date) is
+   l_value varchar2(4000);
+begin
+
+   if not does_cache_key_exist(cache_key) then
+      insert into arcsql_cache (key) values (cache_key);
+   end if;
+
+   update arcsql_cache 
+      set date_value=p_date,
+          update_time=sysdate
+    where key=lower(cache_key);
+
+end;
+
+procedure cache_num (
+   cache_key varchar2, 
+   p_num number) is
+begin
+
+   if not does_cache_key_exist(cache_key) then
+      insert into arcsql_cache (key) values (cache_key);
+   end if;
+
+   update arcsql_cache 
+      set num_value=p_num,
+          update_time=sysdate
+    where key=lower(cache_key);
+    
+end;
+
+function get_cache (cache_key in varchar2) return varchar2 is 
    r varchar2(4000);
 begin
    if does_cache_key_exist(cache_key) then 
-      select value into r from cache where key=lower(cache_key);
+      select value into r from arcsql_cache where key=lower(cache_key);
    else 
       r := null; 
    end if;
    return r;
 end;
 
+function get_cache_date (cache_key varchar2) return date is 
+   r date;
+begin 
+   if does_cache_key_exist(cache_key) then 
+      select date_value into r from arcsql_cache where key=lower(cache_key);
+      return r;
+   else 
+      return null;
+   end if;
+end;
+
+function get_cache_num (cache_key varchar2) return number is 
+   r number;
+begin 
+   if does_cache_key_exist(cache_key) then 
+      select num_value into r from arcsql_cache where key=lower(cache_key);
+      return r;
+   else 
+      return null;
+   end if;
+end;
+
 function does_cache_key_exist (cache_key varchar2) return boolean is
    n number;
 begin
    select count(*) into n
-     from cache
+     from arcsql_cache
     where key=lower(cache_key);
    if n = 0 then
       return false;
@@ -629,7 +684,7 @@ end;
 procedure delete_cache_key (
    cache_key        varchar2) is
 begin
-   delete from cache
+   delete from arcsql_cache
     where key=lower(cache_key);
 end;
 
@@ -1052,7 +1107,7 @@ begin
    -- This is only allowed if you have the license to look at these tables.
    if upper(nvl(arcsql.get_config('sql_log_ash_is_licensed'), 'N')) = 'Y' then
 
-      if nvl(arcsql.return_cached_value('sql_log_last_active_sql_hist_update'), 'x') != to_char(sysdate, 'YYYYMMDDHH24') then
+      if nvl(arcsql.get_cache('sql_log_last_active_sql_hist_update'), 'x') != to_char(sysdate, 'YYYYMMDDHH24') then
 
          arcsql.cache('sql_log_last_active_sql_hist_update', to_char(sysdate, 'YYYYMMDDHH24'));
 
@@ -2787,26 +2842,37 @@ Sensor
 -----------------------------------------------------------------------------------
 */
 
+procedure set_sensor (p_key in varchar2) is 
+begin 
+   select * into g_sensor from arcsql_sensor where sensor_key=p_key;
+end;
+
+function does_sensor_exist (p_key in varchar2) return boolean is 
+   n number;
+begin
+   select count(*) into n from arcsql_sensor where sensor_key=p_key;
+end;
+
 function sensor (
    p_key in varchar2,
    p_input in varchar2,
    p_fail_count in number default 0) return boolean is 
 begin 
    update arcsql_sensor 
-      set matches=decode(p_input, new_value, 'Y', 'N'),
-          old_value=new_value,
-          new_value=p_input,
-          old_updated=new_updated,
-          new_updated=sysdate,
-          fail_count=fail_count+decode(p_input, new_value, 0, 1)
+      set matches=decode(p_input, input, 'Y', 'N'),
+          old_input=input,
+          input=p_input,
+          old_updated=updated,
+          updated=sysdate,
+          fail_count=fail_count+decode(p_input, input, 0, 1)
     where sensor_key=p_key;
    if sql%rowcount = 0 then 
       insert into arcsql_sensor (
          sensor_key,
-         old_value,
-         new_value,
+         old_input,
+         input,
          old_updated,
-         new_updated,
+         updated,
          matches,
          fail_count) values (
          p_key,
@@ -2823,9 +2889,9 @@ begin
    if g_sensor.matches = 'Y' then 
       return false;
    else 
-      g_sensor.sensor_message := 'Sensor detected change in '''||g_sensor.sensor_key||'''.
-Old value: '||g_sensor.old_value||'
-New value :'||g_sensor.new_value;
+      g_sensor.sensor_message := 'Sensor change detected: '''||g_sensor.sensor_key||'''.
+Old input: '||g_sensor.old_input||'
+New input :'||g_sensor.input;
       update arcsql_sensor set sensor_message=g_sensor.sensor_message where sensor_key=p_key;
       commit;
       return true;
