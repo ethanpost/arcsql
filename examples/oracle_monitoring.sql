@@ -1,4 +1,13 @@
 
+/*
+
+This file contains objects related to Oracle monitoring and should be considered
+a work in progress. There are a number of ways to monitor things and I am 
+trying to include a wide range of examples below. Grants required for this 
+are included in the default arcsql_user.sql file.
+
+*/
+
 -- uninstall: drop view v_monitor_autotask_hist;
 -- uninstall: delete from arcsql_cache where cache_key='autotask_job_monitor';
 create or replace view v_arcsql_autotask_job_monitor as 
