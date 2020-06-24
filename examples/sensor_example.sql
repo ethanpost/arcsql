@@ -1,4 +1,20 @@
 
+/*
+
+In the example below we will build a sensor that writes a log entry to the 
+ARCSQL_LOG table anytime it detects a change in the number of tables.
+
+This example is not an ideal solution to the problem. I am only using it 
+for the sake of example and can be helpful on systems in which auditing 
+is not monitored/enabled.
+
+If you have any questions send them to post.ethan@gmail.com.
+
+Thanks,
+Ethan
+
+*/
+
 -- Set up for the example.
 delete from arcsql_log;
 delete from arcsql_sensor where sensor_key='user_table_count_test';
