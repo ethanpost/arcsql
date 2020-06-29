@@ -43,6 +43,11 @@ create or replace package arcsql as
    function str_hash_md5 (text varchar2) return varchar2;
    -- Return true if string appears to be an email address.
    function str_is_email (text varchar2) return boolean;
+   -- Return count of str within str. Can handle >1 length p_char.
+   function str_count (
+      p_str varchar2, 
+      p_char varchar2)
+      return number;
 
    -- Borrowed and adapted from the ora_complexity_check function.
    function str_complexity_check

@@ -105,6 +105,40 @@ begin
    end if;
 end;
 
+function str_count (
+   p_str varchar2, 
+   p_char varchar2)
+   return number is
+   -- Return number of occurrances of a string with another string.
+   -- Not using regex functions. Don't want to deal with escaping chars like "|".
+
+   /*
+   http://www.oracle.com/technology/oramag/code/tips2004/121304.html
+   Aui de la Vega, DBA, in Makati, Philippines
+   This function provides the number of times a pattern occurs in a string (VARCHAR2).
+   */
+
+   c      number;
+   next_index   number;
+   s       varchar2 (2000);
+   p      varchar2 (2000);
+begin
+   c := 0;
+   next_index := 1;
+   s := lower (p_str);
+   p := lower (p_char);
+   for i in 1 .. length (s)
+   loop
+      if     (length (p) <= length (s) - next_index + 1)
+         and (substr (s, next_index, length (p)) = p)
+      then
+         c := c + 1;
+      end if;
+      next_index := next_index + 1;
+   end loop;
+   return c;
+end;
+
 function str_is_date_y_or_n (text varchar2) return varchar2 is
    x date;
 begin
@@ -299,14 +333,14 @@ begin
       return null;
    end if;
    if not p_max_items is null then 
-      token_count := regexp_count(v_list, p_token);
+      token_count := str_count(v_list, p_token);
       v_shift_count := (token_count + 1) - p_max_items;
    end if;
    if v_shift_count <= 0 then 
       return trim(v_list);
    end if;
    for i in 1 .. v_shift_count loop 
-      token_count := regexp_count(v_list, p_token);
+      token_count := str_count(v_list, p_token);
       if token_count = 0 then 
          return null;
       else 
