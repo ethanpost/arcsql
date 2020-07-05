@@ -365,11 +365,12 @@ function num_get_variance_pct (
    p_new_val number;
 begin
    arcsql.debug2('num_get_variance_pct: '||p_val||','||p_pct_chance||','||p_change_low_pct||','||p_change_high_pct||','||p_decimals);
-   if dbms_random.value(1,100) > p_pct_chance then 
+   if dbms_random.value(1,100) <= p_pct_chance then 
+      p_new_val := p_val + round(p_val * dbms_random.value(p_change_low_pct, p_change_high_pct)/100, p_decimals);
+      return round(p_new_val, p_decimals);
+   else 
       return p_val;
    end if;
-   p_new_val := p_val + round(p_val * dbms_random.value(p_change_low_pct, p_change_high_pct)/100, p_decimals);
-   return round(p_new_val, p_decimals);
 end;
 
 function num_get_variance (
