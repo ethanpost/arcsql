@@ -13,6 +13,23 @@ exception
 end;
 /
 
+-- uninstall: drop procedure drop_object;
+create or replace procedure drop_object (object_name varchar2, object_type varchar2) is
+   n number;
+begin
+   select count(*) into n
+     from user_objects 
+    where object_name=upper(drop_object.object_name)
+      and object_type=upper(drop_object.object_type);
+   if n > 0 then
+      execute immediate 'drop '||upper(drop_object.object_type)||' '||upper(drop_object.object_name);
+   end if;
+exception
+   when others then
+      raise;
+end;
+/
+
 -- uninstall: drop function does_object_exist;
 create or replace function does_object_exist (object_name varchar2, object_type varchar2) return boolean authid current_user is
    n number;
@@ -130,23 +147,6 @@ begin
 exception
   when others then
      raise;
-end;
-/
-
--- uninstall: drop procedure drop_object;
-create or replace procedure drop_object (object_name varchar2, object_type varchar2) is
-   n number;
-begin
-   select count(*) into n
-     from user_objects 
-    where object_name=upper(drop_object.object_name)
-      and object_type=upper(drop_object.object_type);
-   if n > 0 then
-      execute immediate 'drop '||upper(drop_object.object_type)||' '||upper(drop_object.object_name);
-   end if;
-exception
-   when others then
-      raise;
 end;
 /
 

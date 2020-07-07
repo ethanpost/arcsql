@@ -548,14 +548,6 @@ begin
 end;
 /
 
--- uninstall: drop sequence seq_version_update_id;
-begin
-   if not does_sequence_exist('seq_version_update_id') then 
-      execute_sql('create sequence seq_version_update_id', false);
-   end if;
-end;
-/
-
 -- uninstall: drop table app_version cascade constraints purge;
 begin
    if not does_table_exist('app_version') then 
@@ -632,11 +624,12 @@ begin
 end;
 /
 
+-- uninstall: drop view database_users;
 create or replace view database_users as (
 select username, account_status, lock_date, created, password_change_date 
   from dba_users);
 
--- uninstall: drop table test_profile cascade constraints purge;
+-- uninstall: drop table app_test_profile cascade constraints purge;
 drop table app_test_profile;
 begin
    if not does_table_exist('app_test_profile') then 
@@ -709,7 +702,7 @@ begin
 end;
 /
 
--- uninstall: drop table contact_group cascade constraints purge;
+-- uninstall: drop table arcsql_contact_group cascade constraints purge;
 drop table arcsql_contact_group;
 begin
    if not does_table_exist('arcsql_contact_group') then 
@@ -767,6 +760,7 @@ begin
 end;
 /
 
+-- uninstall: drop sequence seq_arcsql_alert;
 exec create_sequence('seq_arcsql_alert');
 
 -- uninstall: drop table arcsql_alert cascade constraints purge;
