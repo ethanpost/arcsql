@@ -73,7 +73,10 @@ grant execute on dbms_crypto to &username;
 -- grant delete any table to &username;
 
 
- -- Required for oracle_monitoring.sql.
- grant select on dba_autotask_job_history to &username;
- grant select on dba_tablespaces to &username;
- grant select on gv$database to &username;
+-- Required for oracle_monitoring.sql.
+grant select on dba_autotask_job_history to &username;
+grant select on dba_tablespaces to &username;
+grant select on gv$database to &username;
+
+-- Needed to add scheduled jobs.
+grant create job to &username;
