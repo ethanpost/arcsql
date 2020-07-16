@@ -22,7 +22,11 @@ begin
     where object_name=upper(drop_object.object_name)
       and object_type=upper(drop_object.object_type);
    if n > 0 then
-      execute immediate 'drop '||upper(drop_object.object_type)||' '||upper(drop_object.object_name);
+      if upper(drop_object.object_type) = 'TABLE' then 
+         execute immediate 'drop table '||upper(drop_object.object_name)||' cascade constraints purge';
+      else 
+         execute immediate 'drop '||upper(drop_object.object_type)||' '||upper(drop_object.object_name);
+      end if;
    end if;
 exception
    when others then
