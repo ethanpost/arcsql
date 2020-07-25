@@ -395,7 +395,7 @@ function num_random_gauss(
    p_min number:=null, 
    p_max number:=null) return number is 
   -- Example:
-  -- select round(arcsql.num_random_gauss(4, 4, .5, 14)) g from dual connect by level<=100
+  -- select round(arcsql.num_random_gauss(4, 4, .5, 14)) g from dual connect by level<=100;
   -- Taken from Oracle-L list. Author Sayan Malakshinov (http://orasql.org/).
    res number;
    function gauss return number as
