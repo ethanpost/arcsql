@@ -99,6 +99,12 @@ create or replace package arcsql as
       p_change_high number,
       p_decimals number default 0) return number;
 
+   function num_random_gauss (
+      p_mean number:=0, 
+      p_dev number:=1, 
+      p_min number:=null, 
+      p_max number:=null) return number;
+
    /* 
    -----------------------------------------------------------------------------------
    Utilities

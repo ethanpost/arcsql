@@ -389,6 +389,27 @@ begin
    return round(p_new_val, p_decimals);
 end;
 
+function num_random_gauss(
+   p_mean number:=0, 
+   p_dev number:=1, 
+   p_min number:=null, 
+   p_max number:=null) return number is 
+  -- Example:
+  -- select round(arcsql.num_random_gauss(4, 4, .5, 14)) g from dual connect by level<=100
+  -- Taken from Oracle-L list. Author Sayan Malakshinov (http://orasql.org/).
+   res number;
+   function gauss return number as
+   begin
+     return dbms_random.normal()*p_dev + p_mean;
+   end;
+begin
+    res:=gauss();
+    while not res between p_min and p_max loop
+        res:=gauss();
+    end loop;
+    return res;
+end;
+
 /* 
 -----------------------------------------------------------------------------------
 Utilities
