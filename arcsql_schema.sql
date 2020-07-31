@@ -568,7 +568,6 @@ exec drop_table('VERSION_UPDATE');
 exec drop_sequence('SEQ_VERSION_UPDATE_ID');
 
 -- uninstall: drop table arcsql_log_type cascade constraints purge;
-drop table arcsql_log_type cascade constraints purge;
 begin
    -- log_type is forced to lower case.
    -- New values added automatically if log_interface is called and type is not found.
@@ -630,7 +629,6 @@ select username, account_status, lock_date, created, password_change_date
   from dba_users);
 
 -- uninstall: drop table app_test_profile cascade constraints purge;
-drop table app_test_profile;
 begin
    if not does_table_exist('app_test_profile') then 
       execute_sql('
@@ -671,7 +669,6 @@ end;
 /
 
 -- uninstall: drop table app_test cascade constraints purge;
-drop table app_test cascade constraints purge;
 begin
    if not does_table_exist('app_test') then 
       execute_sql('
@@ -703,7 +700,6 @@ end;
 /
 
 -- uninstall: drop table arcsql_contact_group cascade constraints purge;
-drop table arcsql_contact_group;
 begin
    if not does_table_exist('arcsql_contact_group') then 
       execute_sql('
@@ -730,7 +726,6 @@ end;
 /
 
 -- uninstall: drop table arcsql_alert_priority cascade constraints purge;
-drop table arcsql_alert_priority;
 begin
    if not does_table_exist('arcsql_alert_priority') then 
       execute_sql('
@@ -764,7 +759,6 @@ end;
 exec create_sequence('seq_arcsql_alert');
 
 -- uninstall: drop table arcsql_alert cascade constraints purge;
-drop table arcsql_alert;
 begin
    if not does_table_exist('arcsql_alert') then 
       execute_sql('
@@ -790,7 +784,6 @@ end;
 /
 
 -- uninstall: drop table arcsql_sensor cascade constraints purge;
-drop table arcsql_sensor;
 begin
    if not does_table_exist('arcsql_sensor') then 
       execute_sql('
