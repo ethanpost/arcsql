@@ -94,6 +94,13 @@ begin
    return r;
 end;
 
+function encrypt_sha256 (text varchar2) return varchar2 deterministic is 
+   r varchar2(1000);
+begin
+   r := dbms_crypto.hash(utl_i18n.string_to_raw(text, 'AL32UTF8'), dbms_crypto.hash_sh256);
+   return r;
+end;
+
 function str_is_email (text varchar2) return boolean is 
 begin 
   if regexp_like (text, '^[A-Za-z]+[A-Za-z0-9.]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}$') then 

@@ -41,6 +41,7 @@ create or replace package arcsql as
    function str_random (length in number default 33, string_type in varchar2 default 'an') return varchar2;
    -- Hash a string using MD5. 
    function str_hash_md5 (text varchar2) return varchar2;
+   function encrypt_sha256 (text varchar2) return varchar2 deterministic;
    -- Return true if string appears to be an email address.
    function str_is_email (text varchar2) return boolean;
    -- Return count of str within str. Can handle >1 length p_char.
