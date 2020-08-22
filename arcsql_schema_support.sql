@@ -65,6 +65,30 @@ begin
 end;
 /
 
+create or replace procedure drop_function (function_name in varchar2) is 
+begin 
+  if does_object_exist(drop_function.function_name, 'FUNCTION') then 
+     execute_sql('drop function '||drop_function.function_name);
+  end if;
+end;
+/
+
+create or replace procedure drop_procedure (procedure_name in varchar2) is 
+begin 
+  if does_object_exist(drop_procedure.procedure_name, 'PROCEDURE') then 
+     execute_sql('drop procedure '||drop_procedure.procedure_name);
+  end if;
+end;
+/
+
+create or replace procedure drop_type (type_name in varchar2) is 
+begin 
+  if does_object_exist(drop_type.type_name, 'TYPE') then 
+     execute_sql('drop type '||drop_type.type_name);
+  end if;
+end;
+/
+
 -- uninstall: drop function does_package_exist;
 create or replace function does_package_exist (package_name in varchar2) return boolean is 
 begin 
