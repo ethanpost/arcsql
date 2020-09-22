@@ -65,6 +65,14 @@ begin
 end;
 /
 
+create or replace procedure drop_view (view_name in varchar2) is 
+begin 
+  if does_object_exist(drop_view.view_name, 'VIEW') then 
+     execute_sql('drop view '||drop_view.view_name);
+  end if;
+end;
+/
+
 create or replace procedure drop_function (function_name in varchar2) is 
 begin 
   if does_object_exist(drop_function.function_name, 'FUNCTION') then 
