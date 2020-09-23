@@ -8,6 +8,7 @@ grant create table to &username;
 grant create procedure to &username;
 grant create view to &username;
 grant create trigger to &username;
+grant create type to &username;
 grant create public synonym to &username;
 grant create synonym to &username;
 grant drop public synonym to &username;

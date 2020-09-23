@@ -801,3 +801,33 @@ begin
    end if;
 end;
 /
+
+exec drop_function('to_rows');
+
+exec drop_type('arcsql_csv_tab');
+
+exec drop_type('arcsql_csv_row');
+
+create type arcsql_csv_row as object (
+   token varchar2(120),
+   token_level number);
+/
+
+create type arcsql_csv_tab is table of arcsql_csv_row;
+/
+
+create or replace function to_rows (
+   p_input in varchar2) return arcsql_csv_tab pipelined as
+  cursor tokens is
+  select replace(trim(regexp_substr(p_input,'[^,]+', 1, level)), ' ', ',') token, level
+     from dual connect by regexp_substr(p_input, '[^,]+', 1, level) is not null
+    order by level;
+begin
+  for x in tokens loop
+     pipe row(arcsql_csv_row(x.token, x.level));
+  end loop;
+  return;
+end;
+/
+
+
