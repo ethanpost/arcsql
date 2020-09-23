@@ -817,10 +817,11 @@ create type arcsql_csv_tab is table of arcsql_csv_row;
 /
 
 create or replace function to_rows (
-   p_input in varchar2) return arcsql_csv_tab pipelined as
+   p_csv in varchar2,
+   p_delim varchar2 default ',') return arcsql_csv_tab pipelined as
   cursor tokens is
-  select replace(trim(regexp_substr(p_input,'[^,]+', 1, level)), ' ', ',') token, level
-     from dual connect by regexp_substr(p_input, '[^,]+', 1, level) is not null
+  select replace(trim(regexp_substr(p_csv,'[^'||p_delim||']+', 1, level)), ' ', ',') token, level
+     from dual connect by regexp_substr(p_csv, '[^'||p_delim||']+', 1, level) is not null
     order by level;
 begin
   for x in tokens loop
@@ -829,5 +830,4 @@ begin
   return;
 end;
 /
-
 
