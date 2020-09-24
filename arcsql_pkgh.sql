@@ -31,6 +31,8 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
+   -- Return a string with all non-numeric characters (including blanks) removed.
+   function str_only_num (text varchar2) return varchar2;
    -- Return Y if string converts to a date, else N. Assumes 'MM/DD/YYYY' format.
    function str_is_date_y_or_n (text varchar2) return varchar2;
    -- Return Y if string converts to a number, else N.

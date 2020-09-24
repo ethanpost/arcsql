@@ -146,6 +146,11 @@ begin
    return c;
 end;
 
+function str_only_num (text varchar2) return varchar2 is 
+begin 
+   return regexp_replace(text, '[^[:digit:]]+', '');
+end;
+
 function str_is_date_y_or_n (text varchar2) return varchar2 is
    x date;
 begin
