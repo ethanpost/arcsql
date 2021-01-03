@@ -10,8 +10,8 @@ begin
 end;
 /
 
--- uninstall: drop package arcsql_private_settings;
-create or replace package arcsql_private_settings as 
+-- uninstall: drop package arcsql_user_setting;
+create or replace package arcsql_user_setting as 
    foo number;
 end;
 /

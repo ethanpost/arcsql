@@ -51,6 +51,6 @@ exec dbms_scheduler.drop_job('arcsql_run_sql_log_update');
 exec dbms_scheduler.drop_job('arcsql_purge_events');
 exec dbms_scheduler.drop_job('arcsql_check_alerts');
 exec dbms_scheduler.drop_job('arcsql_check_contact_groups');
-drop package arcsql_public_settings;
+drop package arcsql_default_setting;
 drop procedure send_email;
-drop package arcsql_private_settings;
+drop package arcsql_user_setting;

@@ -773,7 +773,7 @@ begin
    if not v is null then 
       return v;
    end if;
-   s := 'begin :x := arcsql_private_settings.'||setting_name||'; end;';
+   s := 'begin :x := arcsql_user_setting.'||setting_name||'; end;';
    begin 
       execute immediate s using out v;
       if not v is null then 
@@ -783,7 +783,7 @@ begin
       when others then 
          null;
    end;
-   s := 'begin :x := arcsql_public_settings.'||setting_name||'; end;';
+   s := 'begin :x := arcsql_default_setting.'||setting_name||'; end;';
    begin 
       execute immediate s using out v;
       if not v is null then 
@@ -828,6 +828,15 @@ begin
 exception
    when no_data_found then
       return null;
+end;
+
+function is_dev return boolean is 
+begin 
+   if nvl(get_setting('env'), 'prd') = 'dev' then 
+      return true;
+   else 
+      return false;
+   end if;
 end;
 
 /* 

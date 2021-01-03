@@ -2,13 +2,13 @@
 -- Video: https://youtu.be/qN5rJ6zmi2k
 
 -- Drop our private package to start things off.
-exec drop_package('arcsql_private_settings');
+exec drop_package('arcsql_user_setting');
 
--- Should return the value from arcsql_public_settings PL/SQL package header.
+-- Should return the value from arcsql_default_setting PL/SQL package header.
 select arcsql.get_setting('arcsql_admin_email') from dual;
 
--- Now create a arcsql_private_settings PL/SQL package header.
-create or replace package arcsql_private_settings is 
+-- Now create a arcsql_user_setting PL/SQL package header.
+create or replace package arcsql_user_setting is 
    arcsql_admin_email varchar2(120) := '...@gmail.com';
 end;
 /
@@ -29,7 +29,7 @@ exec arcsql.remove_config('arcsql_admin_email');
 select arcsql.get_setting('arcsql_admin_email') from dual;
 
 -- Drop the package.
-exec drop_package('arcsql_private_settings');
+exec drop_package('arcsql_user_setting');
 
 -- We should get the public value.
 select arcsql.get_setting('arcsql_admin_email') from dual;

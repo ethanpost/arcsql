@@ -8,9 +8,10 @@ alter package arcsql compile;
 show errors
 alter package arcsql compile body;
 show errors
-@arcsql_config.sql
+@arcsql_seed_data.sql
 @arcsql_jobs.sql
-@arcsql_public_settings.sql
+@arcsql_default_setting.sql
+@arcsql_user_setting.sql
 @arcsql_stubs.sql
 commit;
 

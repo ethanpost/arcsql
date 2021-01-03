@@ -165,18 +165,25 @@ create or replace package arcsql as
    -----------------------------------------------------------------------------------
    */
 
-   -- Returns value for setting. Looks in arcsql_config table, 
-   -- arcsql_private_settings package, and then arcsql_public_settings package.
+   -- Be ware of the difference between a "setting" and "config" here. 
+   -- "config" functions only deal with the values found in arcsql_config table.
+   -- "get_setting" looks arcsql_config table, then arcsql_user_setting package,
+   -- and then in arcsql_default_setting package. 
+
+   -- Also note all config names are forced to lower-case.
+
+   -- Returns value for the setting. 
    function get_setting(setting_name varchar2) return varchar2 deterministic;
-   
-   -- Add a config setting. Forced to lcase. If already exists nothing happens.
+   -- Add a config value to the arcsql_config table. If already exists nothing happens.
    procedure add_config (name varchar2, value varchar2, description varchar2 default null);
-   -- Update a config setting. Created if it doesn't exist.
+   -- Update a config value in the arcsql_config table. Creates it if it doesn't exist.
    procedure set_config (name varchar2, value varchar2);
-   -- Remove a config setting. 
+   -- Remove a config value from the arcsql_config table. 
    procedure remove_config (name varchar2);
    -- Return the config value. Returns null if it does not exist.
-   function get_config (name varchar2)  return varchar2;
+   function get_config (name varchar2) return varchar2;
+   -- Returns true if get_setting for "env" is set to dev.
+   function is_dev return boolean;
 
    /* 
    -----------------------------------------------------------------------------------

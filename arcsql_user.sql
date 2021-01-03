@@ -1,5 +1,5 @@
 
-define username='arcsql'
+define username='myapp'
 
 -- Direct grant required to create sequences from PL/SQL code.
 grant create sequence to &username;
