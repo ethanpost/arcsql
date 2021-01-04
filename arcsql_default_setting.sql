@@ -24,6 +24,9 @@ create or replace package arcsql_default_setting as
    -- be installed. If they are you should set these values in your private 
    -- arcsql_instance package header.
 
+   -- EMAIL SERVICE
+   saas_from_address varchar2(120) := 'Set this to the from address when sending emails.'
+
    -- SAAS_AUTH 
    -- Salt is added to user's pass to create the final encrypted hash.
    saas_auth_salt varchar2(120) := 'Set this to a random sentence.';

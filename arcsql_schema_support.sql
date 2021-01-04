@@ -108,6 +108,17 @@ begin
 end;
 /
 
+-- uninstall: drop function does_procedure_exist;
+create or replace function does_procedure_exist (procedure_name in varchar2) return boolean is 
+begin 
+  if does_object_exist(does_procedure_exist.procedure_name, 'PROCEDURE') then
+      return true;
+   else
+      return false;
+   end if;
+end;
+/
+
 -- uninstall: drop procedure drop_package;
 create or replace procedure drop_package (package_name in varchar2) is 
 begin 
