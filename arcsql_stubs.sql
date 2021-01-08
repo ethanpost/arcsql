@@ -1,6 +1,10 @@
 
 -- uninstall: drop procedure send_email;
 -- To implement another email service replace this procedure!
+
+-- ToDo: Raise error if any line is >1000 characters long.
+-- ToDo: Add a quick proc to test email.
+
 begin 
    if not does_procedure_exist('send_email') then 
       execute immediate '

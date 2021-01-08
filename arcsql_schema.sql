@@ -623,6 +623,14 @@ begin
 end;
 /
 
+begin 
+   -- Increased the size of this column on 1/8/2021.
+   if arcsql_version <= .11 then 
+      execute_sql('alter table arcsql_log modify (log_text varchar2(2000))');
+   end if;
+end;
+/
+
 -- uninstall: drop view database_users;
 create or replace view database_users as (
 select username, account_status, lock_date, created, password_change_date 
