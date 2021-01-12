@@ -214,6 +214,25 @@ create or replace package arcsql as
     -- Deletes a counter. Nothing happens if it doesn't exist.
    procedure delete_counter (counter_group varchar2, subgroup varchar2, name varchar2);
 
+   /*
+   -----------------------------------------------------------------------------------
+   Request counter user for quickly implementing rate limits.
+   -----------------------------------------------------------------------------------
+   */
+
+   procedure count_request (
+      p_request_key in varchar2, 
+      p_user_key in varchar2 default null);
+
+   function get_request_count (
+      p_request_key in varchar2, 
+      p_user_key in varchar2 default null, 
+      p_min in number default 1) return number;
+
+   function get_current_request_count (
+      p_request_key in varchar2, 
+      p_user_key in varchar2 default null) return number;
+
    /* 
    -----------------------------------------------------------------------------------
    Events

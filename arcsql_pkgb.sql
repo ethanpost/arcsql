@@ -1593,6 +1593,74 @@ begin
    end if;
 end;
 
+/*
+-----------------------------------------------------------------------------------
+Request counter user for quickly implementing rate limits.
+-----------------------------------------------------------------------------------
+*/
+
+procedure count_request (
+   p_request_key in varchar2, 
+   p_user_key in varchar2 default null) is 
+   -- Increments the count for a request by 1 each time it is called.
+   -- Counts are always added to the 'current' minute which is sysdate
+   -- truncated to 'MI' (minute). Adding a user key is optional and should
+   -- be done if you plan to rate limit by user or both user and type of
+   -- request. You can do both.
+begin 
+   update arcsql_request_count set requests=requests+1
+    where request_key=p_request_key 
+      and nvl(user_key, 'x')=nvl(p_user_key, 'x')
+      and time_window=trunc(sysdate, 'MI');
+   if sql%rowcount = 0 then 
+      insert into arcsql_request_count (
+         request_key,
+         user_key,
+         time_window,
+         requests) values (
+         p_request_key,
+         p_user_key,
+         trunc(sysdate, 'MI'),
+         1);
+   end if;
+end;
+
+function get_request_count (
+   p_request_key in varchar2, 
+   p_user_key in varchar2 default null, 
+   p_min in number default 1) return number is 
+   -- Returns the request count for the given request key or request key
+   -- and user key. Does not include requests that are still in the 
+   -- 'current' minute. You need to call get_current_request_count to 
+   -- get that number. p_min determines how many minutes are included.
+   n number;
+begin 
+   select nvl(sum(requests), 0) into n 
+     from arcsql_request_count
+    where request_key=p_request_key
+      and nvl(user_key, 'x')=nvl(p_user_key, nvl(user_key, 'x'))
+      and time_window < trunc(sysdate, 'MI')
+      and time_window >= trunc(sysdate, 'MI')-p_min/1440;
+   return n;
+end;
+
+function get_current_request_count (
+   p_request_key in varchar2, 
+   p_user_key in varchar2 default null) return number is 
+   -- See docs for get_request_count. This only returns the requests
+   -- that have landed in the current minute. You may want to check
+   -- this and get_request_count in the code that implements your 
+   -- rate limiter.
+   n number;
+begin 
+   select nvl(sum(requests), 0) into n 
+     from arcsql_request_count
+    where request_key=p_request_key
+      and nvl(user_key, 'x')=nvl(p_user_key, nvl(user_key, 'x'))
+      and time_window >= trunc(sysdate, 'MI');
+   return n;
+end;
+
 /* 
  -----------------------------------------------------------------------------------
  Events
