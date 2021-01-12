@@ -222,16 +222,16 @@ create or replace package arcsql as
 
    procedure count_request (
       p_request_key in varchar2, 
-      p_user_key in varchar2 default null);
+      p_sub_key in varchar2 default null);
 
    function get_request_count (
       p_request_key in varchar2, 
-      p_user_key in varchar2 default null, 
+      p_sub_key in varchar2 default null, 
       p_min in number default 1) return number;
 
    function get_current_request_count (
       p_request_key in varchar2, 
-      p_user_key in varchar2 default null) return number;
+      p_sub_key in varchar2 default null) return number;
 
    /* 
    -----------------------------------------------------------------------------------

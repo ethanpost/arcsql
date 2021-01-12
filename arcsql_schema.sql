@@ -849,12 +849,12 @@ begin
       create table arcsql_request_count (
       request_count_id number default seq_request_count_id.nextval not null,
       request_key varchar2(120) not null,
-      user_key varchar2(120) default null,
+      sub_key varchar2(120) default null,
       time_window date not null,
       requests number default 0
       )', false);
       execute_sql('alter table arcsql_request_count add constraint pk_arcsql_rl_id primary key (request_count_id)', false);
-      execute_sql('create unique index arcsql_request_count_1 on arcsql_request_count(request_key, time_window)', false);
+      execute_sql('create unique index arcsql_request_count_1 on arcsql_request_count(request_key, sub_key, time_window)', false);
    end if;
 end;
 /
