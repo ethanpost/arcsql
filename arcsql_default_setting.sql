@@ -25,7 +25,7 @@ create or replace package arcsql_default_setting as
    -- arcsql_instance package header.
 
    -- EMAIL SERVICE
-   saas_from_address varchar2(120) := 'Set this to the from address when sending emails.'
+   saas_from_address varchar2(120) := 'Set this to the from address when sending emails.';
 
    -- SAAS_AUTH 
    -- Salt is added to user's pass to create the final encrypted hash.

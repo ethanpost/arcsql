@@ -1,5 +1,10 @@
 
-define username='myapp'
+define username='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+define password='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+
+create user &username identified by &password;
+grant create session to &username;
+alter user &username quota 5g on data;
 
 -- Direct grant required to create sequences from PL/SQL code.
 grant create sequence to &username;
