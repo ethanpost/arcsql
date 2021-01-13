@@ -1,22 +1,17 @@
 # Readme 
 
-A hot mess of things I use when working with Oracle. Will be recording videos for each feature and embedding links in the source soon. Under heavy development at the moment.
+Generic utility library for Oracle that I use to build things.
 
 ## Installation
 
-As an administrative user perform the following step.
+Super easy to install. Instructions found here...
 
-1. Run arcsql_user.sql ${USERNAME} to provide the required grants to the user who will own the packages. 
-
-Perform the following steps as the user whom received the grants in the last step.
-
-1. Consider running uninstall_arcsql.sql if you are testing development versions of the product to ensure all tables are completely rebuilt.
-2. Run the @arcsql_install.sql from the same directory as the user you gave the grants to.
+https://e-t-h-a-n.com/710a8b9b5bae46a28750aab5b1dc8664
 
 ## Uninstall
-As the user who owns the ArcSQL objects run the uninstall_arcsql.sql script.
 
-## Author
+As the user who owns the ArcSQL objects run the uninstall_arcsql.sql script or drop the user and any related scheduled jobs.
 
-* Ethan Ray Post - https://e-t-h-a-n.com/ 
-* I freelance. Get in touch if you want to hire me for a project.
+Thanks,
+Ethan 
+https://e-t-h-a-n.com/ 

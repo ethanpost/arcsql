@@ -1402,6 +1402,7 @@ procedure run_sql_log_update is
    last_elap_secs_per_exe  number;
    v_sql_log sql_log%rowtype;
 begin
+   start_event(p_event_key=>'arcsql', p_sub_key=>'sql_log', p_name=>'run_sql_log_update');
    select count(*) into n from sql_snap where rownum < 2;
    if n = 0 then
       sql_log_take_snapshot;
@@ -1522,6 +1523,7 @@ begin
 
    sql_log_analyze_sql_log_data;
    sql_log_save_active_sess_hist;
+   stop_event(p_event_key=>'arcsql', p_sub_key=>'sql_log', p_name=>'run_sql_log_update');
 
 end;
 
@@ -1670,10 +1672,7 @@ end;
  */
 
 procedure purge_events is 
-/*
-Purge records from audsid_event that are older than 4 hours.
->>> purge_events;
-*/
+   -- Purge records from audsid_event that are older than 4 hours.
    v_hours number;
 begin
    v_hours := get_setting('purge_event_hours');
@@ -1681,34 +1680,34 @@ begin
 end;
 
 procedure start_event (
-   event_group in varchar2, 
-   subgroup in varchar2, 
-   name in varchar2) is 
+   p_event_key in varchar2, 
+   p_sub_key in varchar2, 
+   p_name in varchar2) is 
 -- Start an event timer (autonomous transaction).
--- event_group: Event group (string). Required.
--- subgroup: Event subgroup (string). Can be null.
--- name: Event name (string). Unique within a event_group/sub_group.
+-- event_key: Event group (string). Required.
+-- sub_key: Event sub_key (string). Can be null.
+-- name: Event name (string). Unique within a event_key/sub_group.
    v_audsid number := get_audsid;
    pragma autonomous_transaction;
 begin 
    update audsid_event 
       set start_time=sysdate 
     where audsid=v_audsid
-      and event_group=start_event.event_group
-      and nvl(subgroup, 'x')=nvl(start_event.subgroup, 'x')
-      and name=start_event.name;
+      and event_key=p_event_key
+      and nvl(sub_key, 'x')=nvl(p_sub_key, 'x')
+      and name=p_name;
    -- ToDo: If 1 we may need to log a "miss".
    if sql%rowcount = 0 then 
       insert into audsid_event (
          audsid,
-         event_group,
-         subgroup,
+         event_key,
+         sub_key,
          name,
          start_time) values (
          v_audsid,
-         start_event.event_group,
-         start_event.subgroup,
-         start_event.name,
+         p_event_key,
+         p_sub_key,
+         p_name,
          sysdate
          );
    end if;
@@ -1720,9 +1719,9 @@ exception
 end;
 
 procedure stop_event (
-   event_group in varchar2, 
-   subgroup in varchar2, 
-   name in varchar2) is 
+   p_event_key in varchar2, 
+   p_sub_key in varchar2, 
+   p_name in varchar2) is 
 -- Stop timing an event.
    v_start_time date;
    v_stop_time date;
@@ -1740,9 +1739,9 @@ begin
              v_elapsed_seconds
         from audsid_event 
        where audsid=v_audsid
-         and event_group=stop_event.event_group
-         and nvl(subgroup, 'x')=nvl(stop_event.subgroup, 'x')
-         and name=stop_event.name;
+         and event_key=p_event_key
+         and nvl(sub_key, 'x')=nvl(p_sub_key, 'x')
+         and name=p_name;
    exception
       when no_data_found then 
          -- ToDo: Log the miss, do not raise error as it may break user's code.
@@ -1752,9 +1751,9 @@ begin
    -- Delete the reference we use to calc elap time for this event/session.
    delete from audsid_event
     where audsid=v_audsid
-      and event_group=stop_event.event_group
-      and nvl(subgroup, 'x')=nvl(stop_event.subgroup, 'x')
-      and name=stop_event.name;
+      and event_key=p_event_key
+      and nvl(sub_key, 'x')=nvl(p_sub_key, 'x')
+      and name=p_name;
 
    -- Update the consolidated record in the arcsql_event table.
    update arcsql_event set 
@@ -1762,24 +1761,24 @@ begin
       total_secs=total_secs+v_elapsed_seconds,
       last_start_time=v_start_time,
       last_end_time=v_stop_time
-    where event_group=stop_event.event_group
-      and nvl(subgroup, '~')=nvl(stop_event.subgroup, '~')
-      and name=stop_event.name;
+    where event_key=p_event_key
+      and nvl(sub_key, '~')=nvl(p_sub_key, '~')
+      and name=p_name;
 
    if sql%rowcount = 0 then 
       insert into arcsql_event (
          id,
-         event_group,
-         subgroup,
+         event_key,
+         sub_key,
          name,
          event_count,
          total_secs,
          last_start_time,
          last_end_time) values (
          seq_event_id.nextval,
-         stop_event.event_group,
-         stop_event.subgroup,
-         stop_event.name,
+         p_event_key,
+         p_sub_key,
+         p_name,
          1,
          v_elapsed_seconds,
          v_start_time,
@@ -1794,17 +1793,17 @@ exception
 end;
 
 procedure delete_event (
-   event_group in varchar2, 
-   subgroup in varchar2, 
-   name in varchar2) is 
+   p_event_key in varchar2, 
+   p_sub_key in varchar2, 
+   p_name in varchar2) is 
 -- Delete event data.
    pragma autonomous_transaction;
    v_audsid number := get_audsid;
 begin 
    delete from arcsql_event 
-    where event_group=delete_event.event_group
-      and nvl(subgroup, 'x')=nvl(delete_event.subgroup, 'x')
-      and name=delete_event.name;
+    where event_key=p_event_key
+      and nvl(sub_key, 'x')=nvl(p_sub_key, 'x')
+      and name=p_name;
    commit;
 exception
    when others then 
@@ -3307,6 +3306,7 @@ procedure check_alerts is
    select * from arcsql_alert 
     where status in ('open', 'abandoned');
 begin 
+   start_event(p_event_key=>'arcsql', p_sub_key=>'alerting', p_name=>'check_alerts');
    for open_alert in alerts loop 
       set_alert_priority(open_alert.priority_level);
       if g_alert_priority.close_interval > 0 and 
@@ -3323,6 +3323,7 @@ begin
          remind_alert(open_alert.alert_text);
       end if;
    end loop;
+   stop_event(p_event_key=>'arcsql', p_sub_key=>'alerting', p_name=>'check_alerts');
    commit;
 exception 
    when others then 

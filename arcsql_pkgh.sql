@@ -240,17 +240,20 @@ create or replace package arcsql as
    */
 
    procedure start_event (
-      event_group in varchar2, 
-      subgroup in varchar2, 
-      name in varchar2);
+      p_event_key in varchar2, 
+      p_sub_key in varchar2, 
+      p_name in varchar2);
+
    procedure stop_event (
-      event_group in varchar2, 
-      subgroup in varchar2, 
-      name in varchar2);
+      p_event_key in varchar2, 
+      p_sub_key in varchar2, 
+      p_name in varchar2);
+
    procedure delete_event (
-      event_group in varchar2, 
-      subgroup in varchar2, 
-      name in varchar2);
+      p_event_key in varchar2, 
+      p_sub_key in varchar2, 
+      p_name in varchar2);
+
    procedure purge_events;
 
    /* 

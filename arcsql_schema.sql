@@ -480,6 +480,7 @@ end;
 
 -- uninstall: drop sequence seq_event_id;
 -- uninstall: drop table arcsql_event;
+drop table arcsql_event;
 begin
    if not does_sequence_exist('seq_event_id') then 
       execute_sql('create sequence seq_event_id');
@@ -488,8 +489,8 @@ begin
        execute_sql('
        create table arcsql_event (
        id number not null,
-       event_group varchar2(100) not null,
-       subgroup varchar2(100) default null,
+       event_key varchar2(100) not null,
+       sub_key varchar2(100) default null,
        name varchar2(100) not null,
        event_count number,
        total_secs number,
@@ -512,13 +513,14 @@ end;
 /
 
 -- uninstall: drop table audsid_event;
+drop table audsid_event;
 begin
    if not does_table_exist('audsid_event') then
        execute_sql('
        create table audsid_event (
        audsid number,
-       event_group varchar2(100) not null,
-       subgroup varchar2(100) default null,
+       event_key varchar2(100) not null,
+       sub_key varchar2(100) default null,
        name varchar2(100) not null,
        start_time date
        )', false);
@@ -535,8 +537,8 @@ begin
        execute_sql('
        create table arcsql_event_log (
        id number not null,
-       event_group varchar2(100) not null,
-       subgroup varchar2(100) default null,
+       event_key varchar2(100) not null,
+       sub_key varchar2(100) default null,
        name varchar2(100) not null,
        event_count number,
        total_secs number,
