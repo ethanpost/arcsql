@@ -1841,6 +1841,43 @@ end;
 
 /* 
 -----------------------------------------------------------------------------------
+Setting and getting sys_context values.
+-----------------------------------------------------------------------------------
+*/
+
+procedure set_sys_context (
+   p_namespace in varchar2,
+   p_attribute in varchar2,
+   p_value in varchar2,
+   p_client_id in varchar2 default null) is 
+   v_client_id varchar2(200);
+begin 
+   if p_client_id is null then 
+      v_client_id := sys_context('userenv','client_identifier');
+   else 
+      v_client_id := p_client_id;
+   end if;
+   dbms_session.set_context(
+      namespace => p_namespace,
+      attribute => p_attribute,
+      value     => p_value,
+      client_id => v_client_id);
+exception 
+   when others then 
+      log_err(dbms_utility.format_error_stack, 'set_sys_context');
+      raise;
+end;
+
+function get_sys_context (
+   p_namespace in varchar2,
+   p_attribute in varchar2) return varchar2 is 
+begin 
+   return sys_context(p_namespace, p_attribute);
+end;
+
+
+/* 
+-----------------------------------------------------------------------------------
 Logging
 -----------------------------------------------------------------------------------
 */

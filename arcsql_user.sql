@@ -86,3 +86,8 @@ grant select on gv$database to &username;
 
 -- Needed to add scheduled jobs.
 grant create job to &username;
+
+-- Used to create contexts.
+grant create any context to &username;
+grant drop any context to &username;
+grant execute on dbms_session to &username;
