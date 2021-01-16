@@ -522,6 +522,15 @@ create or replace package arcsql as
       -- p_key in varchar2 default 'arcsql',
       p_tags in varchar2 default null);
 
+   /* 
+   -----------------------------------------------------------------------------------
+   Oracle APEX
+   -----------------------------------------------------------------------------------
+   */
+
+   function apex_get_app_name return varchar2;
+   function apex_get_app_alias return varchar2;
+
 end;
 /
 

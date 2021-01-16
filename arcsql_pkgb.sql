@@ -1862,6 +1862,7 @@ begin
       attribute => p_attribute,
       value     => p_value,
       client_id => v_client_id);
+   debug('set_sys_context: p_namespace='||p_namespace||' p_attribute='||p_attribute||' value='||p_value);
 exception 
    when others then 
       log_err(dbms_utility.format_error_stack, 'set_sys_context');
@@ -3367,6 +3368,20 @@ exception
       rollback;
       raise;
 end;
+
+function apex_get_app_name return varchar2 is 
+   -- Returns APEX application name. 
+   -- https://jeffkemponoracle.com/tag/apex_application/
+begin 
+   return apex_application.g_flow_name;
+end;
+
+function apex_get_app_alias return varchar2 is 
+   -- Returns APEX application alias. 
+begin 
+   return apex_application.g_flow_alias;
+end;
+
 
 end;
 /
