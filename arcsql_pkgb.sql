@@ -362,6 +362,25 @@ begin
    return trim(v_list);
 end;
 
+function str_eval_math (
+   p_expression in varchar2,
+   p_decimals in number := 2) return number is 
+   test_expression varchar2(120) := p_expression;
+   x number;
+begin
+   test_expression := replace(test_expression, '+', '');
+   test_expression := replace(test_expression, '-', '');
+   test_expression := replace(test_expression, '*', '');
+   test_expression := replace(test_expression, '/', '');
+   test_expression := replace(test_expression, '.', '');
+   x := to_number(test_expression);
+   execute immediate 'select ' || p_expression || ' from dual' into x;
+   return round(x, p_decimals);
+exception 
+   when others then 
+      raise_application_error(-20001, 'str_eval_math: Error evaluating expression.');
+end;
+
 /* 
 -----------------------------------------------------------------------------------
 Numbers
@@ -415,9 +434,9 @@ function num_random_gauss(
      return dbms_random.normal()*p_dev + p_mean;
    end;
 begin
-    res:=gauss();
+    res := gauss();
     while not res between p_min and p_max loop
-        res:=gauss();
+        res := gauss();
     end loop;
     return res;
 end;

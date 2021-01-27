@@ -82,6 +82,10 @@ create or replace package arcsql as
       p_shift_count in number default 1,
       p_max_items in number default null) return varchar2;
 
+   function str_eval_math (
+      p_expression in varchar2,
+      p_decimals in number := 2) return number;
+
    /* 
    -----------------------------------------------------------------------------------
    Numbers
