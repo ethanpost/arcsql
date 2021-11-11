@@ -18,7 +18,7 @@ create or replace procedure send_email (
    -- Subject of the email.
    p_subject in varchar2 default null) is
 begin 
-   arcsql.log(''Sending email with subject "''||p_subject||''" to ''||p_to||''.'');
+   arcsql.log(''send_email: from=''||p_from||'', to=''||p_to||'', subject=''||p_subject);
    apex_mail.send(
       p_to=>p_to,
       p_from=>p_from,
@@ -32,16 +32,4 @@ end;
 end;
 /
 
--- uninstall: drop package arcsql_user_setting;
-
-begin 
-   if not does_package_exist('arcsql_user_setting') then 
-      execute immediate '
-create or replace package arcsql_user_setting as 
-   foo number;
-end;
-';
-   end if;
-end;
-/
 

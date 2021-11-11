@@ -12,6 +12,6 @@ show errors
 @arcsql_jobs.sql
 @arcsql_default_setting.sql
 @arcsql_user_setting.sql
-@arcsql_stubs.sql
+@arcsql_send_email_prc.sql
 commit;
 
