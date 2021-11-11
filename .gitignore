@@ -1,5 +1,2 @@
-
-arcsql_private_setting.sql
-private_install.sql
-private_sql_log_scratch.sql
 arcsql_user_setting.sql
+
