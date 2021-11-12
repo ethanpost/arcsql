@@ -24,10 +24,9 @@ create or replace package arcsql_default_setting as
    -- be installed. If they are you should set these values in your private 
    -- arcsql_instance package header.
 
-   -- EMAIL SERVICE
-   saas_from_address varchar2(120) := 'Set this to the from address when sending emails.';
-
-   -- SAAS_AUTH 
+   -- SAAS AUTH
+   -- This address needs to be one of the approved senders if using APEX email.
+   saas_auth_from_address varchar2(120) := 'Set this to the from address when sending emails.';
    -- Salt is added to user's pass to create the final encrypted hash.
    saas_auth_salt varchar2(120) := 'Set this to a random sentence.';
 
@@ -39,3 +38,22 @@ create or replace package arcsql_default_setting as
 
 end;
 /
+
+
+
+/*
+This package contains user config and should not be over-written if it exists.
+*/
+
+-- uninstall: drop package arcsql_user_setting;
+begin
+   if not does_package_exist(package_name=>'arcsql_user_setting') then
+      execute immediate 'create or replace package arcsql_user_setting as 
+   x varchar2(120) := ''foo'';
+end;
+';
+   end if;
+end;
+/
+
+
