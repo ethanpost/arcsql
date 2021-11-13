@@ -6,7 +6,7 @@ Generic utility library for Oracle that I use to build things.
 
 Super easy to install. Instructions found here...
 
-https://e-t-h-a-n.com/710a8b9b5bae46a28750aab5b1dc8664
+https://e-t-h-a-n.com/how-to-install-arcsql
 
 ## Uninstall
 

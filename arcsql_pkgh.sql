@@ -62,10 +62,6 @@ create or replace package arcsql as
        digit      integer := null,
        special    integer := null) return boolean;
 
-   procedure str_raise_complex_value (
-      text varchar2, 
-      allow_regex varchar2 default null);
-
    function str_remove_text_between (
       p_text in varchar2,
       p_left_char in varchar2,
@@ -85,6 +81,12 @@ create or replace package arcsql as
    function str_eval_math (
       p_expression in varchar2,
       p_decimals in number := 2) return number;
+
+   procedure str_raise_complex_value (
+      text varchar2, 
+      allow_regex varchar2 default null);
+
+   procedure str_raise_not_defined(p_str in varchar2 default null);
 
    /* 
    -----------------------------------------------------------------------------------
@@ -534,6 +536,7 @@ create or replace package arcsql as
 
    function apex_get_app_name return varchar2;
    function apex_get_app_alias return varchar2;
+
 
 end;
 /

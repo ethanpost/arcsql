@@ -254,10 +254,10 @@ begin
    return true;
 end;
 
+-- Raise error if value exceeds max len or contains anything but A-z, 0-9, and _(s).
 procedure str_raise_complex_value (
    text varchar2, 
    allow_regex varchar2 default null) is 
-   -- Raise error if value exceeds max len or contains anything but A-z, 0-9, and _(s).
    m varchar2(120);
    max_len number := 1000;
    s varchar2(1000);
@@ -274,6 +274,14 @@ begin
    m := 'Value contains invalid characters.';
    if regexp_replace(s, '[^0-9A-Za-z_]', '') != s then 
       raise_application_error(-20001, m);
+   end if;
+end;
+
+-- Raise error if the input string is not defined.
+procedure str_raise_not_defined(p_str in varchar2 default null) is 
+begin 
+   if p_str is null or trim(p_str) is null then 
+      raise_application_error(-20001, 'str_raise_not_defined: Required string input is not defined.');
    end if;
 end;
 
@@ -781,22 +789,24 @@ Configuration
 -----------------------------------------------------------------------------------
 */
 
+-- Return config value. Checks table, user settings, then default settings.
 function get_setting(setting_name varchar2) return varchar2 deterministic is 
    v varchar2(1000) := null;
    x varchar2(1000) := null;
    s varchar2(1000);
    v_setting_name varchar2(120) := lower(setting_name);
 begin 
+   log('get_setting: name='||setting_name);
    str_raise_complex_value(v_setting_name);
-   v := get_config(v_setting_name);
+   v := trim(get_config(v_setting_name));
    if not v is null then 
       return v;
    end if;
    s := 'begin :x := arcsql_user_setting.'||setting_name||'; end;';
    begin 
       execute immediate s using out v;
-      if not v is null then 
-         return v;
+      if not trim(v) is null then 
+         return trim(v);
       end if;
    exception
       when others then 
@@ -805,13 +815,14 @@ begin
    s := 'begin :x := arcsql_default_setting.'||setting_name||'; end;';
    begin 
       execute immediate s using out v;
-      if not v is null then 
-         return v;
+      if not trim(v) is null then 
+         return trim(v);
       end if;
    exception
       when others then 
          null;
    end;
+   -- Raise an error if nothing found.
    raise_application_error(-20001,'get_setting: '||setting_name||' not found.');
 end;
 
@@ -839,6 +850,7 @@ begin
    end if;
 end;
 
+-- Return value from config table.
 function get_config (name varchar2) return varchar2 is
    config_value varchar2(1000);
 begin
@@ -3400,7 +3412,6 @@ function apex_get_app_alias return varchar2 is
 begin 
    return apex_application.g_flow_alias;
 end;
-
 
 end;
 /
