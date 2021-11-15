@@ -1989,9 +1989,9 @@ exception
 end;
 
 procedure log (
-   log_text in varchar2, 
-   log_key in varchar2 default null, 
-   log_tags in varchar2 default null,
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
    log_type in varchar2 default 'log',
    metric_name_1 in varchar2 default null,
    metric_1 in number default null,
@@ -1999,9 +1999,9 @@ procedure log (
    metric_2 in number default null) is 
 begin
    log_interface(
-      p_text=>log_text, 
-      p_key=>log_key, 
-      p_tags=>log_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>0, 
       p_type=>log_type,
       p_metric_name_1=>metric_name_1,
@@ -2011,18 +2011,18 @@ begin
 end;
 
 procedure log_notify (
-   notify_text in varchar2, 
-   notify_key in varchar2 default null, 
-   notify_tags in varchar2 default null,
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
    metric_name_1 in varchar2 default null,
    metric_1 in number default null,
    metric_name_2 in varchar2 default null,
    metric_2 in number default null) is 
 begin
    log_interface(
-      p_text=>notify_text, 
-      p_key=>notify_key, 
-      p_tags=>notify_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>0, 
       p_type=>'notify',
       p_metric_name_1=>metric_name_1,
@@ -2031,19 +2031,40 @@ begin
       p_metric_2=>metric_2);
 end;
 
-procedure log_audit (
-   audit_text in varchar2, 
-   audit_key in varchar2 default null, 
-   audit_tags in varchar2 default null,
+procedure log_deprecated (
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
    metric_name_1 in varchar2 default null,
    metric_1 in number default null,
    metric_name_2 in varchar2 default null,
    metric_2 in number default null) is 
 begin
    log_interface(
-      p_text=>audit_text, 
-      p_key=>audit_key, 
-      p_tags=>audit_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
+      p_level=>0, 
+      p_type=>'deprecated',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+procedure log_audit (
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>0, 
       p_type=>'audit',
       p_metric_name_1=>metric_name_1,
@@ -2053,18 +2074,18 @@ begin
 end;
 
 procedure log_err (
-   error_text in varchar2, 
-   error_key in varchar2 default null, 
-   error_tags in varchar2 default null,
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
    metric_name_1 in varchar2 default null,
    metric_1 in number default null,
    metric_name_2 in varchar2 default null,
    metric_2 in number default null) is 
 begin
    log_interface(
-      p_text=>error_text, 
-      p_key=>error_key, 
-      p_tags=>error_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>-1, 
       p_type=>'error',
       p_metric_name_1=>metric_name_1,
@@ -2074,18 +2095,18 @@ begin
 end;
 
 procedure debug (
-   debug_text in varchar2, 
-   debug_key in varchar2 default null, 
-   debug_tags in varchar2 default null,
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
    metric_name_1 in varchar2 default null,
    metric_1 in number default null,
    metric_name_2 in varchar2 default null,
    metric_2 in number default null) is 
 begin
    log_interface(
-      p_text=>debug_text, 
-      p_key=>debug_key, 
-      p_tags=>debug_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>1, 
       p_type=>'debug',
       p_metric_name_1=>metric_name_1,
@@ -2095,18 +2116,18 @@ begin
 end;
 
 procedure debug2 (
-   debug_text in varchar2, 
-   debug_key in varchar2 default null, 
-   debug_tags in varchar2 default null,
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
    metric_name_1 in varchar2 default null,
    metric_1 in number default null,
    metric_name_2 in varchar2 default null,
    metric_2 in number default null) is 
 begin
    log_interface(
-      p_text=>debug_text, 
-      p_key=>debug_key, 
-      p_tags=>debug_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>2, 
       p_type=>'debug2',
       p_metric_name_1=>metric_name_1,
@@ -2116,18 +2137,18 @@ begin
 end;
 
 procedure debug3 (
-   debug_text in varchar2, 
-   debug_key in varchar2 default null, 
-   debug_tags in varchar2 default null,
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
    metric_name_1 in varchar2 default null,
    metric_1 in number default null,
    metric_name_2 in varchar2 default null,
    metric_2 in number default null) is 
 begin
    log_interface(
-      p_text=>debug_text, 
-      p_key=>debug_key, 
-      p_tags=>debug_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>3, 
       p_type=>'debug3',
       p_metric_name_1=>metric_name_1,
@@ -2137,18 +2158,18 @@ begin
 end;
 
 procedure log_fail (
-   fail_text in varchar2, 
-   fail_key in varchar2 default null, 
-   fail_tags in varchar2 default null,
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
    metric_name_1 in varchar2 default null,
    metric_1 in number default null,
    metric_name_2 in varchar2 default null,
    metric_2 in number default null) is 
 begin
    log_interface(
-      p_text=>fail_text, 
-      p_key=>fail_key, 
-      p_tags=>fail_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>-1, 
       p_type=>'fail',
       p_metric_name_1=>metric_name_1,
@@ -2158,27 +2179,27 @@ begin
 end;
 
 procedure log_sms (
-   sms_text in varchar2, 
-   sms_key in varchar2 default null, 
-   sms_tags in varchar2 default null) is 
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null) is 
 begin
    log_interface(
-      p_text=>sms_text, 
-      p_key=>sms_key, 
-      p_tags=>sms_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>0, 
       p_type=>'sms');
 end;
 
 procedure log_email (
-   email_text in varchar2, 
-   email_key in varchar2 default null, 
-   email_tags in varchar2 default null) is 
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null) is 
 begin
    log_interface(
-      p_text=>email_text, 
-      p_key=>email_key, 
-      p_tags=>email_tags, 
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
       p_level=>0, 
       p_type=>'email');
 end;
@@ -2662,8 +2683,8 @@ begin
    if g_app_test.test_status in ('RETRY') and retry_interval then 
       if not g_app_test_profile.retry_log_type is null then
          arcsql.log(
-            log_text=>'['||g_app_test_profile.retry_log_type||'] Application test '''||g_app_test.test_name||''' is being retried.',
-            log_key=>'app_test');
+            p_text=>'['||g_app_test_profile.retry_log_type||'] Application test '''||g_app_test.test_name||''' is being retried.',
+            p_key=>'app_test');
       end if;
       time_to_test := true;
    end if;
@@ -2719,8 +2740,8 @@ procedure app_test_check is
       g_app_test.total_abandons := g_app_test.total_abandons + 1;
       if not g_app_test_profile.abandon_log_type is null then 
          arcsql.log(
-            log_text=>'['||g_app_test_profile.abandon_log_type||'] Application test '''||g_app_test.test_name||''' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
-            log_key=>'app_test');
+            p_text=>'['||g_app_test_profile.abandon_log_type||'] Application test '''||g_app_test.test_name||''' is being abandoned after '||g_app_test_profile.abandon_interval||' minutes.',
+            p_key=>'app_test');
       end if;
       -- If reset is Y the test changes back to PASS and will likely FAIL on the next check and cycle through the whole process again.
       if nvl(g_app_test_profile.abandon_reset, 'N') = 'N' then 
@@ -2755,8 +2776,8 @@ procedure app_test_check is
       g_app_test.total_reminders := g_app_test.total_reminders + 1;
       if not g_app_test_profile.reminder_log_type is null then
          arcsql.log(
-            log_text=>'['||g_app_test_profile.reminder_log_type||'] A reminder that application test '''||g_app_test.test_name||''' is still failing.',
-            log_key=>'app_test');
+            p_text=>'['||g_app_test_profile.reminder_log_type||'] A reminder that application test '''||g_app_test.test_name||''' is still failing.',
+            p_key=>'app_test');
       end if;
    end;
 
@@ -2794,8 +2815,8 @@ procedure app_test_fail (p_message in varchar2 default null) is
       g_app_test.total_failures := g_app_test.total_failures + 1;
       if not g_app_test_profile.failed_log_type is null then 
          arcsql.log(
-            log_text=>'['||g_app_test_profile.failed_log_type||'] Application test '''||g_app_test.test_name||''' has failed.',
-            log_key=>'app_test');
+            p_text=>'['||g_app_test_profile.failed_log_type||'] Application test '''||g_app_test.test_name||''' has failed.',
+            p_key=>'app_test');
       end if;
    end;
 
@@ -2851,8 +2872,8 @@ procedure app_test_pass is
       g_app_test.retry_count := 0;
       if not g_app_test_profile.pass_log_type is null then
          arcsql.log (
-            log_text=>'['||g_app_test_profile.pass_log_type||'] Application test '''||g_app_test.test_name||''' is now passing.',
-            log_key=>'app_test');
+            p_text=>'['||g_app_test_profile.pass_log_type||'] Application test '''||g_app_test.test_name||''' is now passing.',
+            p_key=>'app_test');
       end if;
    end;
 
@@ -3404,13 +3425,15 @@ function apex_get_app_name return varchar2 is
    -- Returns APEX application name. 
    -- https://jeffkemponoracle.com/tag/apex_application/
 begin 
-   return apex_application.g_flow_name;
+   log_deprecated('apex_get_app_name: ');
+   return trim(apex_application.g_flow_name);
 end;
 
 function apex_get_app_alias return varchar2 is 
    -- Returns APEX application alias. 
 begin 
-   return apex_application.g_flow_alias;
+   log_deprecated('apex_get_app_alias: ');
+   return trim(apex_application.g_flow_alias);
 end;
 
 end;
