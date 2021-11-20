@@ -103,7 +103,9 @@ end;
 
 function str_is_email (text varchar2) return boolean is 
 begin 
-  if regexp_like (text, '^[A-Za-z]+[A-Za-z0-9.]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}$') then 
+  -- "Anything more complex will likely return false negatives and run slower."
+  -- https://stackoverflow.com/questions/801166/sql-script-to-find-invalid-email-addresses
+  if regexp_like (text, '.*@.*\..*') then
       arcsql.debug2('str_is_email: yes: '||text);
       return true;
   else 
@@ -2157,6 +2159,28 @@ begin
       p_metric_2=>metric_2);
 end;
 
+procedure log_pass (
+   p_text in varchar2, 
+   p_key in varchar2 default null, 
+   p_tags in varchar2 default null,
+   metric_name_1 in varchar2 default null,
+   metric_1 in number default null,
+   metric_name_2 in varchar2 default null,
+   metric_2 in number default null) is 
+begin
+   log_interface(
+      p_text=>p_text, 
+      p_key=>p_key, 
+      p_tags=>p_tags, 
+      p_level=>-1, 
+      p_type=>'pass',
+      p_metric_name_1=>metric_name_1,
+      p_metric_1=>metric_1,
+      p_metric_name_2=>metric_name_2,
+      p_metric_2=>metric_2);
+end;
+
+
 procedure log_fail (
    p_text in varchar2, 
    p_key in varchar2 default null, 
@@ -2415,43 +2439,52 @@ Unit Testing
 -----------------------------------------------------------------------------------
 */
 
+
 procedure pass_test is 
 begin 
    test_passed := 1;
    test;
 end;
 
+
 procedure fail_test(fail_message in varchar2 default null) is 
 begin 
    test_passed := 0;
    test;
-   raise_application_error(-20001, '*** Failure *** '||fail_message);
 end;
+
 
 procedure test is 
 begin
    if test_passed = 1 then 
       dbms_output.put_line('passed: '||arcsql.test_name);
-   elsif test_passed = 0 then 
+      arcsql.log_pass(arcsql.test_name);
+   elsif (test_passed = 0) or (assert_true != true or assert_false != false or assert != true) then
       dbms_output.put_line('failed: '||arcsql.test_name);
       arcsql.log_fail(arcsql.test_name);
-   elsif assert_true != true or assert_false != false or assert != true then
-      dbms_output.put_line('failed: '||arcsql.test_name);
-      arcsql.log_fail(arcsql.test_name);
+      raise_application_error(-20001, 'failed: '||arcsql.test_name);
    else 
       dbms_output.put_line('passed: '||arcsql.test_name);
+      arcsql.log_pass(arcsql.test_name);
    end if;
-   init_test('unknown');
+   test_is_running := false;
 end;
+
 
 procedure init_test(test_name varchar2) is 
 begin
+   if test_is_running and arcsql.test_name is not null then 
+      pass_test;
+   end if;
+   debug('init_test: '||test_name);
+   test_is_running := true;
    test_passed := -1;
    assert := true;
    assert_true := true;
    assert_false := false;
    arcsql.test_name := init_test.test_name;
 end;
+
 
  /* 
  -----------------------------------------------------------------------------------

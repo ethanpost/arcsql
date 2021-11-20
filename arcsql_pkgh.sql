@@ -440,6 +440,7 @@ create or replace package arcsql as
    -- -1 initialized, 1 true, 0 false
    test_name varchar2(255) := null;
    test_passed number := -1;
+   test_is_running boolean := false;
    assert boolean := true;
    assert_true boolean := true;
    assert_false boolean := false;
